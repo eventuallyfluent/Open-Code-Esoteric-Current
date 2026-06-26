@@ -1,0 +1,1060 @@
+﻿# Final review: 3b5ed75..80d37a4
+
+## Commits
+80d37a4 feat(worker): GitHub Actions workflows -- manual trigger and daily schedule
+89a5b43 feat(worker): full orchestration pipeline ΓÇö research ΓåÆ claim ΓåÆ collect ΓåÆ synthesize ΓåÆ submit
+ec33b4a feat(worker): DeepSeek client and agent implementations ΓÇö research, collector, synthesizer
+d81717b feat(worker): HMAC signer, retry wrapper, WordPress REST client
+d1a2146 feat(worker): scaffold ΓÇö package.json, env config, logger, entry point
+8aa3cf2 feat(theme): CSS polish ΓÇö responsive, spacing, block overrides
+059bfd6 fix(theme): add namespace-qualified function calls in masthead pattern
+3c135c2 feat(theme): template parts and masthead pattern
+1971cad feat(theme): all template files ΓÇö home, single, page, archive, search, 404, submission
+0067d2a feat(theme): scaffold block theme with theme.json, templates, parts
+
+## Files changed
+ theme/assets/editor.css                 |   5 ++
+ theme/assets/theme.css                  |  67 ++++++++++++++++++
+ theme/functions.php                     |  23 ++++++
+ theme/parts/footer.html                 |   7 ++
+ theme/parts/header.html                 |  10 +++
+ theme/parts/masthead.html               |   6 ++
+ theme/parts/policy-strip.html           |   7 ++
+ theme/parts/signals-rail.html           |   7 ++
+ theme/patterns/masthead.php             |  11 +++
+ theme/screenshot.png                    | Bin 0 -> 67 bytes
+ theme/style.css                         |  12 ++++
+ theme/templates/404.html                |  13 ++++
+ theme/templates/archive.html            |  29 ++++++++
+ theme/templates/home.html               |  33 +++++++++
+ theme/templates/index.html              |  10 +++
+ theme/templates/page.html               |   8 +++
+ theme/templates/search.html             |  23 ++++++
+ theme/templates/single.html             |  24 +++++++
+ theme/templates/submission.html         |   9 +++
+ theme/theme.json                        | 121 ++++++++++++++++++++++++++++++++
+ worker/.env.example                     |  10 +++
+ worker/.github/workflows/automation.yml |  31 ++++++++
+ worker/.github/workflows/schedule.yml   |  27 +++++++
+ worker/package.json                     |  17 +++++
+ worker/src/agents/collector.js          |  19 +++++
+ worker/src/agents/research.js           |  21 ++++++
+ worker/src/agents/synthesizer.js        |  19 +++++
+ worker/src/config.js                    |  20 ++++++
+ worker/src/deepseek.js                  |  30 ++++++++
+ worker/src/index.js                     | 116 ++++++++++++++++++++++++++++++
+ worker/src/utils/hmac.js                |  19 +++++
+ worker/src/utils/logger.js              |  11 +++
+ worker/src/utils/retry.js               |  12 ++++
+ worker/src/wordpress.js                 |  29 ++++++++
+ 34 files changed, 806 insertions(+)
+
+## Diff
+diff --git a/theme/assets/editor.css b/theme/assets/editor.css
+new file mode 100644
+index 0000000..afebd5c
+--- /dev/null
++++ b/theme/assets/editor.css
+@@ -0,0 +1,5 @@
++body { font-family: Inter, sans-serif; line-height: 1.7; color: #2C2C2C; background: #F5F0E8; }
++h1, h2, h3, h4, h5, h6 { font-family: 'Playfair Display', serif; }
++a { color: #6B1D2F; }
++.wp-block { max-width: 720px; }
++.wp-block[data-align="wide"] { max-width: 1140px; }
+diff --git a/theme/assets/theme.css b/theme/assets/theme.css
+new file mode 100644
+index 0000000..6b11d9a
+--- /dev/null
++++ b/theme/assets/theme.css
+@@ -0,0 +1,67 @@
++:root {
++  --ec-rule-height: 1px;
++  --ec-card-shadow: 0 1px 3px rgba(0,0,0,0.08);
++  --ec-transition: 200ms ease;
++}
++
++body {
++  -webkit-font-smoothing: antialiased;
++  -moz-osx-font-smoothing: grayscale;
++}
++
++.wp-site-blocks {
++  max-width: 100%;
++}
++
++.is-style-ec-thin-rule {
++  height: var(--ec-rule-height) !important;
++  background: var(--wp--preset--color--muted-gold) !important;
++}
++
++.wp-block-post-title a {
++  text-decoration: none;
++  transition: color var(--ec-transition);
++}
++
++.wp-block-post-title a:hover {
++  color: var(--wp--preset--color--muted-gold);
++}
++
++.wp-block-query-pagination {
++  margin-top: 2rem;
++  gap: 0.5rem;
++}
++
++.wp-block-query-pagination a {
++  padding: 0.5rem 1rem;
++  border: 1px solid var(--wp--preset--color--light-gray);
++  text-decoration: none;
++  transition: all var(--ec-transition);
++}
++
++.wp-block-query-pagination a:hover {
++  background: var(--wp--preset--color--deep-burgundy);
++  color: white;
++  border-color: var(--wp--preset--color--deep-burgundy);
++}
++
++.wp-block-post-featured-image img {
++  width: 100%;
++  height: auto;
++  max-height: 480px;
++  object-fit: cover;
++}
++
++.wp-block-search__button {
++  border-radius: 0;
++}
++
++@media (max-width: 768px) {
++  .wp-block-group.has-background {
++    padding-left: 1rem !important;
++    padding-right: 1rem !important;
++  }
++  .wp-block-post-title {
++    font-size: var(--wp--preset--font-size--x-large) !important;
++  }
++}
+diff --git a/theme/functions.php b/theme/functions.php
+new file mode 100644
+index 0000000..82685be
+--- /dev/null
++++ b/theme/functions.php
+@@ -0,0 +1,23 @@
++<?php
++namespace ObservatoryIndex;
++
++add_action('after_setup_theme', function () {
++    add_editor_style('assets/editor.css');
++    add_theme_support('wp-block-styles');
++    add_theme_support('align-wide');
++    add_theme_support('responsive-embeds');
++
++    register_block_style('core/separator', [
++        'name' => 'ec-thin-rule',
++        'label' => __('Thin Rule', 'observatory-index'),
++    ]);
++});
++
++add_action('wp_enqueue_scripts', function () {
++    wp_enqueue_style('observatory-index-google-fonts', 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@400;600;700&display=swap', [], null);
++    wp_enqueue_style('observatory-index-theme', get_template_directory_uri() . '/assets/theme.css', ['observatory-index-google-fonts'], wp_get_theme()->get('Version'));
++});
++
++add_action('init', function () {
++    require_once get_template_directory() . '/patterns/masthead.php';
++});
+diff --git a/theme/parts/footer.html b/theme/parts/footer.html
+new file mode 100644
+index 0000000..1c95242
+--- /dev/null
++++ b/theme/parts/footer.html
+@@ -0,0 +1,7 @@
++<!-- wp:group {"style":{"color":{"background":"#000000"},"spacing":{"padding":{"top":"2rem","bottom":"2rem"}}},"textColor":"white","layout":{"type":"constrained"}} -->
++<div class="wp-block-group has-white-color has-black-background-color has-text-color has-background" style="padding-top:2rem;padding-bottom:2rem">
++    <!-- wp:paragraph {"align":"center","fontSize":"small"} -->
++    <p class="has-text-align-center has-small-font-size">┬⌐ 2026 The Esoteric Current. All rights reserved.</p>
++    <!-- /wp:paragraph -->
++</div>
++<!-- /wp:group -->
+diff --git a/theme/parts/header.html b/theme/parts/header.html
+new file mode 100644
+index 0000000..a29fac1
+--- /dev/null
++++ b/theme/parts/header.html
+@@ -0,0 +1,10 @@
++<!-- wp:group {"style":{"color":{"background":"#000000"}},"layout":{"type":"constrained"}} -->
++<div class="wp-block-group has-black-background-color has-background">
++    <!-- wp:group {"layout":{"type":"flex","flexWrap":"nowrap","justifyContent":"space-between"},"style":{"spacing":{"padding":{"top":"1rem","bottom":"1rem"}}}} -->
++    <div class="wp-block-group" style="padding-top:1rem;padding-bottom:1rem">
++        <!-- wp:site-title /-->
++        <!-- wp:navigation /-->
++    </div>
++    <!-- /wp:group -->
++</div>
++<!-- /wp:group -->
+diff --git a/theme/parts/masthead.html b/theme/parts/masthead.html
+new file mode 100644
+index 0000000..ff11191
+--- /dev/null
++++ b/theme/parts/masthead.html
+@@ -0,0 +1,6 @@
++<!-- wp:group {"style":{"color":{"background":"#000000"},"spacing":{"padding":{"top":"4rem","bottom":"4rem"}}},"textColor":"white","layout":{"type":"constrained"}} -->
++<div class="wp-block-group has-white-color has-black-background-color has-text-color has-background" style="padding-top:4rem;padding-bottom:4rem">
++    <!-- wp:site-title {"textAlign":"center","style":{"typography":{"fontSize":"3rem","fontStyle":"normal","fontWeight":"700"}}} /-->
++    <!-- wp:site-tagline {"textAlign":"center","style":{"typography":{"fontSize":"1rem"}},"textColor":"muted-gold"} /-->
++</div>
++<!-- /wp:group -->
+diff --git a/theme/parts/policy-strip.html b/theme/parts/policy-strip.html
+new file mode 100644
+index 0000000..6bdff7c
+--- /dev/null
++++ b/theme/parts/policy-strip.html
+@@ -0,0 +1,7 @@
++<!-- wp:group {"style":{"color":{"background":"#2C2C2C"},"spacing":{"padding":{"top":"0.5rem","bottom":"0.5rem"}}},"textColor":"light-gray","fontSize":"small","layout":{"type":"flex","flexWrap":"wrap","justifyContent":"center"}} -->
++<div class="wp-block-group has-light-gray-color has-charcoal-background-color has-text-color has-background has-small-font-size" style="padding-top:0.5rem;padding-bottom:0.5rem">
++    <!-- wp:paragraph {"style":{"typography":{"fontSize":"0.75rem"}}} -->
++    <p style="font-size:0.75rem">All content is curated. Views expressed are those of the authors.</p>
++    <!-- /wp:paragraph -->
++</div>
++<!-- /wp:group -->
+diff --git a/theme/parts/signals-rail.html b/theme/parts/signals-rail.html
+new file mode 100644
+index 0000000..381016b
+--- /dev/null
++++ b/theme/parts/signals-rail.html
+@@ -0,0 +1,7 @@
++<!-- wp:group {"style":{"color":{"background":"#1A2238"},"spacing":{"padding":{"top":"0.75rem","bottom":"0.75rem"}}},"textColor":"warm-white","layout":{"type":"constrained"}} -->
++<div class="wp-block-group has-warm-white-color has-dark-navy-background-color has-text-color has-background" style="padding-top:0.75rem;padding-bottom:0.75rem">
++    <!-- wp:paragraph {"align":"center","fontSize":"small"} -->
++    <p class="has-text-align-center has-small-font-size">Latest signals will appear here</p>
++    <!-- /wp:paragraph -->
++</div>
++<!-- /wp:group -->
+diff --git a/theme/patterns/masthead.php b/theme/patterns/masthead.php
+new file mode 100644
+index 0000000..f1d6b43
+--- /dev/null
++++ b/theme/patterns/masthead.php
+@@ -0,0 +1,11 @@
++<?php
++\register_block_pattern('observatory-index/masthead', [
++    'title' => \__('Masthead', 'observatory-index'),
++    'description' => \__('Site masthead with title and tagline.', 'observatory-index'),
++    'content' => '<!-- wp:group {"style":{"color":{"background":"#000000"},"spacing":{"padding":{"top":"4rem","bottom":"4rem"}}},"textColor":"white","layout":{"type":"constrained"}} -->
++<div class="wp-block-group has-white-color has-black-background-color has-text-color has-background" style="padding-top:4rem;padding-bottom:4rem">
++    <!-- wp:site-title {"textAlign":"center","style":{"typography":{"fontSize":"3rem"}}} /-->
++    <!-- wp:site-tagline {"textAlign":"center","textColor":"muted-gold"} /-->
++</div>
++<!-- /wp:group -->',
++]);
+diff --git a/theme/screenshot.png b/theme/screenshot.png
+new file mode 100644
+index 0000000..8c3bb35
+Binary files /dev/null and b/theme/screenshot.png differ
+diff --git a/theme/style.css b/theme/style.css
+new file mode 100644
+index 0000000..e57ca77
+--- /dev/null
++++ b/theme/style.css
+@@ -0,0 +1,12 @@
++/*
++Theme Name: Observatory Index
++Theme URI: https://theesotericcurrent.com
++Description: A prestige block theme for The Esoteric Current ΓÇö automated esoteric research publication.
++Author: The Esoteric Current
++Version: 1.0.0
++Requires at least: 6.4
++Tested up to: 6.6
++Requires PHP: 8.1
++License: GPLv2 or later
++Text Domain: observatory-index
++*/
+diff --git a/theme/templates/404.html b/theme/templates/404.html
+new file mode 100644
+index 0000000..ac13b72
+--- /dev/null
++++ b/theme/templates/404.html
+@@ -0,0 +1,13 @@
++<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
++<!-- wp:group {"tagName":"main","layout":{"type":"constrained"},"style":{"spacing":{"padding":{"top":"6rem","bottom":"6rem"}}}} -->
++<main class="wp-block-group" style="padding-top:6rem;padding-bottom:6rem">
++    <!-- wp:heading {"textAlign":"center","level":1} -->
++    <h1 class="wp-block-heading has-text-align-center">Not Found</h1>
++    <!-- /wp:heading -->
++    <!-- wp:paragraph {"align":"center"} -->
++    <p class="has-text-align-center">The page you're looking for has been lost to the currents. Try searching instead.</p>
++    <!-- /wp:paragraph -->
++    <!-- wp:search {"label":"Search","showLabel":false,"width":50,"widthUnit":"%","buttonText":"Search"} /-->
++</main>
++<!-- /wp:group -->
++<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->
+diff --git a/theme/templates/archive.html b/theme/templates/archive.html
+new file mode 100644
+index 0000000..bdafc0d
+--- /dev/null
++++ b/theme/templates/archive.html
+@@ -0,0 +1,29 @@
++<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
++<!-- wp:group {"tagName":"main","layout":{"type":"constrained"},"style":{"spacing":{"padding":{"top":"2rem","bottom":"3rem"}}}} -->
++<main class="wp-block-group" style="padding-top:2rem;padding-bottom:3rem">
++    <!-- wp:query-title {"type":"archive"} /-->
++    <!-- wp:term-description /-->
++    <!-- wp:separator {"className":"is-style-ec-thin-rule"} -->
++    <hr class="wp-block-separator has-alpha-channel-opacity is-style-ec-thin-rule"/>
++    <!-- /wp:separator -->
++    <!-- wp:query {"queryId":1,"query":{"perPage":10,"pages":0,"offset":0,"postType":"post","order":"desc","orderBy":"date","sticky":"","inherit":true},"layout":{"type":"constrained"}} -->
++    <div class="wp-block-query">
++        <!-- wp:post-template -->
++        <!-- wp:group {"style":{"border":{"bottom":{"color":"#e8e4dc","width":"1px"}},"spacing":{"padding":{"bottom":"1.5rem","top":"1.5rem"}}}} -->
++        <div class="wp-block-group" style="border-bottom:1px solid #e8e4dc;padding-top:1.5rem;padding-bottom:1.5rem">
++            <!-- wp:post-title {"isLink":true,"fontSize":"large"} /-->
++            <!-- wp:post-excerpt /-->
++            <!-- wp:post-date {"fontSize":"small","textColor":"deep-burgundy"} /-->
++        </div>
++        <!-- /wp:group -->
++        <!-- /wp:post-template -->
++        <!-- wp:query-pagination -->
++        <!-- wp:query-pagination-previous /-->
++        <!-- wp:query-pagination-numbers /-->
++        <!-- wp:query-pagination-next /-->
++        <!-- /wp:query-pagination -->
++    </div>
++    <!-- /wp:query -->
++</main>
++<!-- /wp:group -->
++<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->
+diff --git a/theme/templates/home.html b/theme/templates/home.html
+new file mode 100644
+index 0000000..e6cefb5
+--- /dev/null
++++ b/theme/templates/home.html
+@@ -0,0 +1,33 @@
++<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
++<!-- wp:group {"tagName":"main","layout":{"type":"constrained"},"style":{"spacing":{"padding":{"top":"2rem","bottom":"3rem"}}}} -->
++<main class="wp-block-group" style="padding-top:2rem;padding-bottom:3rem">
++    <!-- wp:pattern {"slug":"observatory-index/masthead"} /-->
++    <!-- wp:heading {"level":2,"style":{"typography":{"fontStyle":"normal","fontWeight":"600"}},"fontSize":"large"} -->
++    <h2 class="wp-block-heading has-large-font-size" style="font-style:normal;font-weight:600">Latest from the Current</h2>
++    <!-- /wp:heading -->
++    <!-- wp:query {"queryId":0,"query":{"perPage":10,"pages":0,"offset":0,"postType":"post","order":"desc","orderBy":"date","author":"","search":"","sticky":"","inherit":false},"layout":{"type":"constrained"}} -->
++    <div class="wp-block-query">
++        <!-- wp:post-template -->
++        <!-- wp:group {"style":{"border":{"bottom":{"color":"#e8e4dc","width":"1px"}},"spacing":{"padding":{"bottom":"1.5rem","top":"1.5rem"}}}} -->
++        <div class="wp-block-group" style="border-bottom:1px solid #e8e4dc;padding-top:1.5rem;padding-bottom:1.5rem">
++            <!-- wp:post-title {"isLink":true,"fontSize":"large"} /-->
++            <!-- wp:post-excerpt /-->
++            <!-- wp:group {"layout":{"type":"flex","flexWrap":"wrap"},"style":{"typography":{"fontSize":"0.875rem"}},"textColor":"deep-burgundy"} -->
++            <div class="wp-block-group has-deep-burgundy-color has-text-color" style="font-size:0.875rem">
++                <!-- wp:post-date /-->
++                <!-- wp:post-terms {"term":"category"} /-->
++            </div>
++            <!-- /wp:group -->
++        </div>
++        <!-- /wp:group -->
++        <!-- /wp:post-template -->
++        <!-- wp:query-pagination -->
++        <!-- wp:query-pagination-previous /-->
++        <!-- wp:query-pagination-numbers /-->
++        <!-- wp:query-pagination-next /-->
++        <!-- /wp:query-pagination -->
++    </div>
++    <!-- /wp:query -->
++</main>
++<!-- /wp:group -->
++<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->
+diff --git a/theme/templates/index.html b/theme/templates/index.html
+new file mode 100644
+index 0000000..b5c0205
+--- /dev/null
++++ b/theme/templates/index.html
+@@ -0,0 +1,10 @@
++<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
++<!-- wp:group {"tagName":"main","layout":{"type":"constrained"},"style":{"spacing":{"padding":{"top":"3rem","bottom":"3rem"}}}} -->
++<main class="wp-block-group" style="padding-top:3rem;padding-bottom:3rem">
++    <!-- wp:heading {"level":1,"textAlign":"center"} -->
++    <h1 class="wp-block-heading has-text-align-center">The Esoteric Current</h1>
++    <!-- /wp:heading -->
++    <!-- wp:post-content /-->
++</main>
++<!-- /wp:group -->
++<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->
+diff --git a/theme/templates/page.html b/theme/templates/page.html
+new file mode 100644
+index 0000000..a509583
+--- /dev/null
++++ b/theme/templates/page.html
+@@ -0,0 +1,8 @@
++<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
++<!-- wp:group {"tagName":"main","layout":{"type":"constrained"},"style":{"spacing":{"padding":{"top":"3rem","bottom":"3rem"}}}} -->
++<main class="wp-block-group" style="padding-top:3rem;padding-bottom:3rem">
++    <!-- wp:post-title {"level":1} /-->
++    <!-- wp:post-content /-->
++</main>
++<!-- /wp:group -->
++<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->
+diff --git a/theme/templates/search.html b/theme/templates/search.html
+new file mode 100644
+index 0000000..29565ca
+--- /dev/null
++++ b/theme/templates/search.html
+@@ -0,0 +1,23 @@
++<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
++<!-- wp:group {"tagName":"main","layout":{"type":"constrained"},"style":{"spacing":{"padding":{"top":"2rem","bottom":"3rem"}}}} -->
++<main class="wp-block-group" style="padding-top:2rem;padding-bottom:3rem">
++    <!-- wp:search {"label":"Search","showLabel":false,"placeholder":"Search the esoteric currents...","width":100,"widthUnit":"%","buttonText":"Search","buttonUseIcon":true} /-->
++    <!-- wp:query-title {"type":"search"} /-->
++    <!-- wp:separator {"className":"is-style-ec-thin-rule"} -->
++    <hr class="wp-block-separator has-alpha-channel-opacity is-style-ec-thin-rule"/>
++    <!-- /wp:separator -->
++    <!-- wp:query {"queryId":2,"query":{"perPage":10,"pages":0,"offset":0,"postType":"post","order":"desc","orderBy":"date","sticky":"","inherit":true},"layout":{"type":"constrained"}} -->
++    <div class="wp-block-query">
++        <!-- wp:post-template -->
++        <!-- wp:group {"style":{"border":{"bottom":{"color":"#e8e4dc","width":"1px"}},"spacing":{"padding":{"bottom":"1.5rem","top":"1.5rem"}}}} -->
++        <div class="wp-block-group" style="border-bottom:1px solid #e8e4dc;padding-top:1.5rem;padding-bottom:1.5rem">
++            <!-- wp:post-title {"isLink":true,"fontSize":"large"} /-->
++            <!-- wp:post-excerpt /-->
++        </div>
++        <!-- /wp:group -->
++        <!-- /wp:post-template -->
++    </div>
++    <!-- /wp:query -->
++</main>
++<!-- /wp:group -->
++<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->
+diff --git a/theme/templates/single.html b/theme/templates/single.html
+new file mode 100644
+index 0000000..ee8e358
+--- /dev/null
++++ b/theme/templates/single.html
+@@ -0,0 +1,24 @@
++<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
++<!-- wp:group {"tagName":"main","layout":{"type":"constrained"},"style":{"spacing":{"padding":{"top":"3rem","bottom":"3rem"}}}} -->
++<main class="wp-block-group" style="padding-top:3rem;padding-bottom:3rem">
++    <!-- wp:post-featured-image /-->
++    <!-- wp:post-title {"level":1} /-->
++    <!-- wp:group {"layout":{"type":"flex","flexWrap":"wrap"},"style":{"typography":{"fontSize":"0.875rem"}},"textColor":"deep-burgundy"} -->
++    <div class="wp-block-group has-deep-burgundy-color has-text-color" style="font-size:0.875rem">
++        <!-- wp:post-date /-->
++        <!-- wp:post-terms {"term":"category","prefix":"in "} /-->
++        <!-- wp:post-terms {"term":"post_tag","prefix":"Tags: "} /-->
++    </div>
++    <!-- /wp:group -->
++    <!-- wp:separator {"className":"is-style-ec-thin-rule"} -->
++    <hr class="wp-block-separator has-alpha-channel-opacity is-style-ec-thin-rule"/>
++    <!-- /wp:separator -->
++    <!-- wp:post-content /-->
++    <!-- wp:separator {"className":"is-style-ec-thin-rule"} -->
++    <hr class="wp-block-separator has-alpha-channel-opacity is-style-ec-thin-rule"/>
++    <!-- /wp:separator -->
++    <!-- wp:post-navigation-link {"type":"previous","label":"ΓåÉ Previous"} /-->
++    <!-- wp:post-navigation-link {"type":"next","label":"Next ΓåÆ"} /-->
++</main>
++<!-- /wp:group -->
++<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->
+diff --git a/theme/templates/submission.html b/theme/templates/submission.html
+new file mode 100644
+index 0000000..c50f7f8
+--- /dev/null
++++ b/theme/templates/submission.html
+@@ -0,0 +1,9 @@
++<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
++<!-- wp:group {"tagName":"main","layout":{"type":"constrained"},"style":{"spacing":{"padding":{"top":"3rem","bottom":"3rem"}}}} -->
++<main class="wp-block-group" style="padding-top:3rem;padding-bottom:3rem">
++    <!-- wp:post-title {"level":1} /-->
++    <!-- wp:post-content /-->
++    <!-- wp:ec/submission-form {} /-->
++</main>
++<!-- /wp:group -->
++<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->
+diff --git a/theme/theme.json b/theme/theme.json
+new file mode 100644
+index 0000000..748827a
+--- /dev/null
++++ b/theme/theme.json
+@@ -0,0 +1,121 @@
++{
++  "$schema": "https://schemas.wp.org/trunk/theme.json",
++  "version": 2,
++  "settings": {
++    "appearanceTools": true,
++    "color": {
++      "palette": [
++        { "slug": "black", "color": "#000000", "name": "Black" },
++        { "slug": "warm-white", "color": "#F5F0E8", "name": "Warm White" },
++        { "slug": "muted-gold", "color": "#C8A84E", "name": "Muted Gold" },
++        { "slug": "deep-burgundy", "color": "#6B1D2F", "name": "Deep Burgundy" },
++        { "slug": "dark-navy", "color": "#1A2238", "name": "Dark Navy" },
++        { "slug": "charcoal", "color": "#2C2C2C", "name": "Charcoal" },
++        { "slug": "light-gray", "color": "#E8E4DC", "name": "Light Gray" },
++        { "slug": "white", "color": "#FFFFFF", "name": "White" }
++      ],
++      "duotone": [
++        {
++          "slug": "gold-burgundy",
++          "colors": [ "#1A2238", "#C8A84E" ],
++          "name": "Gold on Navy"
++        }
++      ]
++    },
++    "typography": {
++      "fontFamilies": [
++        {
++          "slug": "serif",
++          "name": "Serif",
++          "fontFamily": "'Playfair Display', Georgia, 'Times New Roman', serif"
++        },
++        {
++          "slug": "sans",
++          "name": "Sans-Serif",
++          "fontFamily": "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
++        },
++        {
++          "slug": "mono",
++          "name": "Monospace",
++          "fontFamily": "'JetBrains Mono', 'Fira Code', monospace"
++        }
++      ],
++      "fluid": true,
++      "fontSizes": [
++        { "slug": "small", "size": "0.875rem", "fluid": { "min": "0.875rem", "max": "1rem" } },
++        { "slug": "medium", "size": "1rem", "fluid": { "min": "1rem", "max": "1.125rem" } },
++        { "slug": "large", "size": "1.25rem", "fluid": { "min": "1.125rem", "max": "1.5rem" } },
++        { "slug": "x-large", "size": "1.75rem", "fluid": { "min": "1.5rem", "max": "2rem" } },
++        { "slug": "xx-large", "size": "2.5rem", "fluid": { "min": "2rem", "max": "3rem" } }
++      ],
++      "dropCap": false
++    },
++    "layout": {
++      "contentSize": "720px",
++      "wideSize": "1140px"
++    },
++    "spacing": {
++      "padding": true,
++      "margin": true,
++      "units": ["px", "em", "rem", "vh", "vw", "%"]
++    }
++  },
++  "styles": {
++    "color": {
++      "background": "var(--wp--preset--color--warm-white)",
++      "text": "var(--wp--preset--color--charcoal)"
++    },
++    "typography": {
++      "fontFamily": "var(--wp--preset--font-family--sans)",
++      "lineHeight": 1.7
++    },
++    "elements": {
++      "h1": { "typography": { "fontFamily": "var(--wp--preset--font-family--serif)", "fontSize": "var(--wp--preset--font-size--xx-large)", "lineHeight": 1.2 } },
++      "h2": { "typography": { "fontFamily": "var(--wp--preset--font-family--serif)", "fontSize": "var(--wp--preset--font-size--x-large)", "lineHeight": 1.25 } },
++      "h3": { "typography": { "fontFamily": "var(--wp--preset--font-family--serif)", "fontSize": "var(--wp--preset--font-size--large)", "lineHeight": 1.3 } },
++      "h4": { "typography": { "fontFamily": "var(--wp--preset--font-family--serif)", "lineHeight": 1.35 } },
++      "h5": { "typography": { "fontFamily": "var(--wp--preset--font-family--serif)", "lineHeight": 1.4 } },
++      "h6": { "typography": { "fontFamily": "var(--wp--preset--font-family--serif)", "lineHeight": 1.4 } },
++      "link": {
++        "color": { "text": "var(--wp--preset--color--deep-burgundy)" },
++        ":hover": { "color": { "text": "var(--wp--preset--color--muted-gold)" } }
++      },
++      "button": {
++        "color": { "background": "var(--wp--preset--color--black)", "text": "var(--wp--preset--color--white)" },
++        "typography": { "fontFamily": "var(--wp--preset--font-family--sans)" },
++        "spacing": { "padding": { "top": "0.75rem", "bottom": "0.75rem", "left": "1.5rem", "right": "1.5rem" } },
++        "border": { "radius": "0" }
++      }
++    },
++    "blocks": {
++      "core/site-title": {
++        "typography": { "fontFamily": "var(--wp--preset--font-family--serif)", "fontSize": "var(--wp--preset--font-size--x-large)" },
++        "color": { "text": "var(--wp--preset--color--white)" }
++      },
++      "core/post-title": {
++        "typography": { "fontFamily": "var(--wp--preset--font-family--serif)" }
++      },
++      "core/navigation": {
++        "typography": { "fontFamily": "var(--wp--preset--font-family--sans)", "fontSize": "var(--wp--preset--font-size--small)" },
++        "color": { "text": "var(--wp--preset--color--white)" }
++      },
++      "core/separator": {
++        "color": { "background": "var(--wp--preset--color--muted-gold)" },
++        "spacing": { "margin": { "top": "2rem", "bottom": "2rem" } }
++      },
++      "core/query-pagination": {
++        "typography": { "fontFamily": "var(--wp--preset--font-family--sans)", "fontSize": "var(--wp--preset--font-size--small)" }
++      }
++    }
++  },
++  "customTemplates": [
++    { "name": "submission", "title": "Submission", "postTypes": ["page"] }
++  ],
++  "templateParts": [
++    { "name": "header", "title": "Header", "area": "header" },
++    { "name": "footer", "title": "Footer", "area": "footer" },
++    { "name": "masthead", "title": "Masthead", "area": "uncategorized" },
++    { "name": "signals-rail", "title": "Signals Rail", "area": "uncategorized" },
++    { "name": "policy-strip", "title": "Policy Strip", "area": "uncategorized" }
++  ]
++}
+diff --git a/worker/.env.example b/worker/.env.example
+new file mode 100644
+index 0000000..6802d69
+--- /dev/null
++++ b/worker/.env.example
+@@ -0,0 +1,10 @@
++# Required
++DEEPSEEK_API_KEY=sk-your-key-here
++WORDPRESS_URL=https://theesotericcurrent.com
++WORDPRESS_API_KEY=your-ec-api-key
++WORDPRESS_API_SECRET=your-ec-api-secret
++
++# Optional
++DEEPSEEK_MODEL=deepseek-chat
++LOG_LEVEL=info
++DRY_RUN=false
+diff --git a/worker/.github/workflows/automation.yml b/worker/.github/workflows/automation.yml
+new file mode 100644
+index 0000000..f5241cf
+--- /dev/null
++++ b/worker/.github/workflows/automation.yml
+@@ -0,0 +1,31 @@
++name: Run Automation Worker
++
++on:
++  workflow_dispatch:
++    inputs:
++      dry_run:
++        description: 'Dry run (no API calls)'
++        type: boolean
++        default: false
++
++jobs:
++  run:
++    runs-on: ubuntu-latest
++    defaults:
++      run:
++        working-directory: ./worker
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-node@v4
++        with:
++          node-version: '20'
++          cache: 'npm'
++          cache-dependency-path: ./worker/package.json
++      - run: npm ci --omit=dev
++      - run: npm start
++        env:
++          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
++          WORDPRESS_URL: ${{ secrets.WORDPRESS_URL }}
++          WORDPRESS_API_KEY: ${{ secrets.WORDPRESS_API_KEY }}
++          WORDPRESS_API_SECRET: ${{ secrets.WORDPRESS_API_SECRET }}
++          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+diff --git a/worker/.github/workflows/schedule.yml b/worker/.github/workflows/schedule.yml
+new file mode 100644
+index 0000000..bb51943
+--- /dev/null
++++ b/worker/.github/workflows/schedule.yml
+@@ -0,0 +1,27 @@
++name: Scheduled Automation
++
++on:
++  schedule:
++    # Runs at 06:00 UTC daily
++    - cron: '0 6 * * *'
++
++jobs:
++  run:
++    runs-on: ubuntu-latest
++    defaults:
++      run:
++        working-directory: ./worker
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-node@v4
++        with:
++          node-version: '20'
++          cache: 'npm'
++          cache-dependency-path: ./worker/package.json
++      - run: npm ci --omit=dev
++      - run: npm start
++        env:
++          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
++          WORDPRESS_URL: ${{ secrets.WORDPRESS_URL }}
++          WORDPRESS_API_KEY: ${{ secrets.WORDPRESS_API_KEY }}
++          WORDPRESS_API_SECRET: ${{ secrets.WORDPRESS_API_SECRET }}
+diff --git a/worker/package.json b/worker/package.json
+new file mode 100644
+index 0000000..d41cbc7
+--- /dev/null
++++ b/worker/package.json
+@@ -0,0 +1,17 @@
++{
++  "name": "esoteric-current-worker",
++  "version": "1.0.0",
++  "private": true,
++  "type": "module",
++  "description": "One-shot automation worker for The Esoteric Current ΓÇö runs in GitHub Actions",
++  "main": "src/index.js",
++  "scripts": {
++    "start": "node src/index.js",
++    "test": "node --test tests/**/*.test.js",
++    "dry-run": "node src/index.js --dry-run"
++  },
++  "engines": {
++    "node": ">=20.0.0"
++  },
++  "devDependencies": {}
++}
+diff --git a/worker/src/agents/collector.js b/worker/src/agents/collector.js
+new file mode 100644
+index 0000000..9961a26
+--- /dev/null
++++ b/worker/src/agents/collector.js
+@@ -0,0 +1,19 @@
++export function createCollectorAgent(deepseek) {
++  return {
++    async deepDive(topic) {
++      const systemPrompt = `You are a research assistant compiling a briefing on an esoteric topic. Return a JSON object with: title (string), summary (string, 2-3 paragraphs), key_points (array of strings), sources (array of {title, url?, relevance}), related_traditions (array of strings), significance_score (number 0-1). Be specific and cite verifiable information.`;
++
++      const res = await deepseek.chat([
++        { role: 'system', content: systemPrompt },
++        { role: 'user', content: `Compile a detailed briefing on: ${topic.title} ΓÇö ${topic.reason}` },
++      ], { temperature: 0.6, maxTokens: 8192 });
++
++      const text = res.choices?.[0]?.message?.content || '{}';
++      try {
++        return JSON.parse(text.replace(/```(?:json)?\n?/g, '').trim());
++      } catch {
++        return null;
++      }
++    },
++  };
++}
+diff --git a/worker/src/agents/research.js b/worker/src/agents/research.js
+new file mode 100644
+index 0000000..a590ac8
+--- /dev/null
++++ b/worker/src/agents/research.js
+@@ -0,0 +1,21 @@
++export function createResearchAgent(deepseek) {
++  return {
++    async discoverTopics(categories = []) {
++      const systemPrompt = `You are a research librarian specializing in esoteric studies. Your role: identify noteworthy current developments, publications, discussions, and emerging topics in esoteric traditions. Categories: ${categories.join(', ')}.
++
++Return a JSON array of objects with: title (string), category (string), reason (string ΓÇö why this is noteworthy now), confidence (number 0-1). Maximum 5 items.`;
++
++      const res = await deepseek.chat([
++        { role: 'system', content: systemPrompt },
++        { role: 'user', content: 'What is currently noteworthy in esoteric studies?' },
++      ], { temperature: 0.8 });
++
++      const text = res.choices?.[0]?.message?.content || '[]';
++      try {
++        return JSON.parse(text.replace(/```(?:json)?\n?/g, '').trim());
++      } catch {
++        return [];
++      }
++    },
++  };
++}
+diff --git a/worker/src/agents/synthesizer.js b/worker/src/agents/synthesizer.js
+new file mode 100644
+index 0000000..ae0c8c5
+--- /dev/null
++++ b/worker/src/agents/synthesizer.js
+@@ -0,0 +1,19 @@
++export function createSynthesizerAgent(deepseek) {
++  return {
++    async synthesize(briefing) {
++      const systemPrompt = `You are a senior editor at an esoteric publication. Format the following research briefing into a publishable article. Return JSON: title, content (HTML-formatted article body, 800-1200 words), excerpt (1-2 sentences), tags (array of strings), estimated_reading_time_minutes (number). Tone: authoritative, clear, slightly formal. Use <h2> for section breaks, <blockquote> for notable quotes.`;
++
++      const res = await deepseek.chat([
++        { role: 'system', content: systemPrompt },
++        { role: 'user', content: JSON.stringify(briefing, null, 2) },
++      ], { temperature: 0.5, maxTokens: 16384 });
++
++      const text = res.choices?.[0]?.message?.content || '{}';
++      try {
++        return JSON.parse(text.replace(/```(?:json)?\n?/g, '').trim());
++      } catch {
++        return null;
++      }
++    },
++  };
++}
+diff --git a/worker/src/config.js b/worker/src/config.js
+new file mode 100644
+index 0000000..0277943
+--- /dev/null
++++ b/worker/src/config.js
+@@ -0,0 +1,20 @@
++import { env } from 'node:process';
++
++const required = ['DEEPSEEK_API_KEY', 'WORDPRESS_URL', 'WORDPRESS_API_KEY', 'WORDPRESS_API_SECRET'];
++
++export function loadConfig() {
++  const missing = required.filter(k => !env[k]);
++  if (missing.length > 0) {
++    throw new Error(`Missing required env vars: ${missing.join(', ')}`);
++  }
++  return Object.freeze({
++    deepseekApiKey: env.DEEPSEEK_API_KEY,
++    deepseekModel: env.DEEPSEEK_MODEL || 'deepseek-chat',
++    wordpressUrl: env.WORDPRESS_URL.replace(/\/+$/, ''),
++    wordpressApiKey: env.WORDPRESS_API_KEY,
++    wordpressApiSecret: env.WORDPRESS_API_SECRET,
++    logLevel: env.LOG_LEVEL || 'info',
++    dryRun: env.DRY_RUN === 'true' || process.argv.includes('--dry-run'),
++    maxRetries: Number(env.MAX_RETRIES || '3'),
++  });
++}
+diff --git a/worker/src/deepseek.js b/worker/src/deepseek.js
+new file mode 100644
+index 0000000..f7c05bd
+--- /dev/null
++++ b/worker/src/deepseek.js
+@@ -0,0 +1,30 @@
++import { withRetry } from './utils/retry.js';
++
++export function createDeepSeekClient(config, log) {
++  async function chat(messages, options = {}) {
++    const { model = config.deepseekModel, temperature = 0.7, maxTokens = 4096 } = options;
++
++    return withRetry(async () => {
++      const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
++        method: 'POST',
++        headers: {
++          'Authorization': `Bearer ${config.deepseekApiKey}`,
++          'Content-Type': 'application/json',
++        },
++        body: JSON.stringify({
++          model,
++          messages,
++          temperature,
++          max_tokens: maxTokens,
++        }),
++      });
++      if (!res.ok) {
++        const text = await res.text();
++        throw new Error(`DeepSeek API ${res.status}: ${text}`);
++      }
++      return res.json();
++    }, { maxRetries: config.maxRetries, log });
++  }
++
++  return { chat };
++}
+diff --git a/worker/src/index.js b/worker/src/index.js
+new file mode 100644
+index 0000000..885e24b
+--- /dev/null
++++ b/worker/src/index.js
+@@ -0,0 +1,116 @@
++import { loadConfig } from './config.js';
++import { createLogger } from './utils/logger.js';
++import { createDeepSeekClient } from './deepseek.js';
++import { createWordPressClient } from './wordpress.js';
++import { createResearchAgent } from './agents/research.js';
++import { createCollectorAgent } from './agents/collector.js';
++import { createSynthesizerAgent } from './agents/synthesizer.js';
++
++const ESOTERIC_CATEGORIES = [
++  'Hermeticism',
++  'Alchemy',
++  'Astrology',
++  'Ceremonial Magic',
++  'Kabbalah',
++  'Gnosticism',
++  'Dzogchen',
++  'Shamanism',
++  'Tantra',
++  'Sufism',
++  'Mysticism',
++  'Esoteric Christianity',
++  'Theosophy',
++  'Rosicrucianism',
++  'Neoplatonism',
++];
++
++async function main() {
++  const config = loadConfig();
++  const log = createLogger(config.logLevel);
++
++  log.info('worker-start', { dryRun: config.dryRun, model: config.deepseekModel });
++
++  // Check WordPress connectivity
++  const wp = createWordPressClient(config, log);
++  const deepseek = createDeepSeekClient(config, log);
++
++  if (!config.dryRun) {
++    try {
++      await wp.health();
++      log.info('wp-health-ok');
++    } catch (err) {
++      log.error('wp-health-failed', err.message);
++      process.exit(1);
++    }
++  }
++
++  // Phase 1: Research
++  log.info('phase-research-start');
++  const research = createResearchAgent(deepseek);
++  let topics;
++  if (config.dryRun) {
++    topics = [
++      { title: 'Test Topic', category: 'Hermeticism', reason: 'Dry run test', confidence: 0.5 },
++    ];
++    log.info('dry-run: using mock topics');
++  } else {
++    topics = await research.discoverTopics(ESOTERIC_CATEGORIES);
++    log.info('phase-research-complete', { count: topics.length });
++  }
++
++  // Phase 2: Claim topics with WordPress
++  let claimResult;
++  if (!config.dryRun && topics.length > 0) {
++    claimResult = await wp.claim(topics);
++    log.info('topics-claimed', { count: topics.length, claimed: claimResult?.claimed?.length ?? 0 });
++  }
++
++  // Phase 3: Collect + Synthesize for each topic
++  const collector = createCollectorAgent(deepseek);
++  const synthesizer = createSynthesizerAgent(deepseek);
++
++  const articles = [];
++  const topicsToProcess = config.dryRun ? topics : (claimResult?.claimed ?? topics);
++
++  for (const topic of topicsToProcess) {
++    log.info('process-topic', { title: topic.title });
++
++    // Collect
++    const briefing = await collector.deepDive(topic);
++    if (!briefing) {
++      log.warn('collect-failed', { title: topic.title });
++      continue;
++    }
++    log.info('collect-complete', { title: topic.title, keyPoints: briefing.key_points?.length ?? 0 });
++
++    // Synthesize
++    const article = await synthesizer.synthesize(briefing);
++    if (!article) {
++      log.warn('synthesize-failed', { title: topic.title });
++      continue;
++    }
++    log.info('synthesize-complete', { title: article.title, wordCount: article.content?.length ?? 0 });
++
++    articles.push({ ...article, _briefing: briefing });
++
++    // Submit to WordPress
++    if (!config.dryRun) {
++      await wp.submitArticle({
++        title: article.title,
++        content: article.content,
++        excerpt: article.excerpt,
++        tags: article.tags,
++        source_category: topic.category,
++        research_notes: JSON.stringify(briefing),
++      });
++      log.info('article-submitted', { title: article.title });
++    }
++  }
++
++  log.info('worker-complete', { articlesProduced: articles.length });
++}
++
++main().catch(err => {
++  console.error(JSON.stringify({ l: 'error', t: new Date().toISOString(), m: err.message, stack: err.stack }));
++  process.exit(1);
++});
+diff --git a/worker/src/utils/hmac.js b/worker/src/utils/hmac.js
+new file mode 100644
+index 0000000..dc91dda
+--- /dev/null
++++ b/worker/src/utils/hmac.js
+@@ -0,0 +1,19 @@
++import { createHmac, randomBytes } from 'node:crypto';
++
++export function sign(payload, secret, nonce = randomBytes(16).toString('hex')) {
++  const timestamp = Math.floor(Date.now() / 1000);
++  const data = `${nonce}:${timestamp}:${JSON.stringify(payload)}`;
++  const signature = createHmac('sha256', secret).update(data).digest('hex');
++  return { nonce, timestamp, signature };
++}
++
++export function buildAuthHeaders(payload, apiKey, apiSecret) {
++  const { nonce, timestamp, signature } = sign(payload, apiSecret);
++  return {
++    'X-EC-Key': apiKey,
++    'X-EC-Nonce': nonce,
++    'X-EC-Timestamp': String(timestamp),
++    'X-EC-Signature': signature,
++    'Content-Type': 'application/json',
++  };
++}
+diff --git a/worker/src/utils/logger.js b/worker/src/utils/logger.js
+new file mode 100644
+index 0000000..7a432c2
+--- /dev/null
++++ b/worker/src/utils/logger.js
+@@ -0,0 +1,11 @@
++const levels = { error: 0, warn: 1, info: 2, debug: 3 };
++
++export function createLogger(level = 'info') {
++  const threshold = levels[level] ?? levels.info;
++  return {
++    error: (...args) => threshold >= 0 && console.error(JSON.stringify({ l: 'error', t: new Date().toISOString(), m: args.join(' ') })),
++    warn:  (...args) => threshold >= 1 && console.warn( JSON.stringify({ l: 'warn',  t: new Date().toISOString(), m: args.join(' ') })),
++    info:  (...args) => threshold >= 2 && console.log(  JSON.stringify({ l: 'info',  t: new Date().toISOString(), m: args.join(' ') })),
++    debug: (...args) => threshold >= 3 && console.log(  JSON.stringify({ l: 'debug', t: new Date().toISOString(), m: args.join(' ') })),
++  };
++}
+diff --git a/worker/src/utils/retry.js b/worker/src/utils/retry.js
+new file mode 100644
+index 0000000..66ffcc7
+--- /dev/null
++++ b/worker/src/utils/retry.js
+@@ -0,0 +1,12 @@
++export async function withRetry(fn, { maxRetries = 3, baseMs = 1000, log = console } = {}) {
++  for (let attempt = 0; attempt <= maxRetries; attempt++) {
++    try {
++      return await fn();
++    } catch (err) {
++      if (attempt === maxRetries) throw err;
++      const wait = baseMs * Math.pow(2, attempt) + Math.random() * 1000;
++      log.warn(`retry ${attempt + 1}/${maxRetries} after ${Math.round(wait)}ms: ${err.message}`);
++      await new Promise(r => setTimeout(r, wait));
++    }
++  }
++}
+diff --git a/worker/src/wordpress.js b/worker/src/wordpress.js
+new file mode 100644
+index 0000000..06c769b
+--- /dev/null
++++ b/worker/src/wordpress.js
+@@ -0,0 +1,29 @@
++import { buildAuthHeaders } from './utils/hmac.js';
++import { withRetry } from './utils/retry.js';
++
++export function createWordPressClient(config, log) {
++  async function apiPost(endpoint, payload) {
++    const url = new URL(`/wp-json/esoteric-current/v1/${endpoint}`, config.wordpressUrl).href;
++
++    return withRetry(async () => {
++      const headers = buildAuthHeaders(payload, config.wordpressApiKey, config.wordpressApiSecret);
++      const res = await fetch(url, {
++        method: 'POST',
++        headers,
++        body: JSON.stringify(payload),
++      });
++      if (!res.ok) {
++        const text = await res.text();
++        throw new Error(`WP API ${res.status}: ${text}`);
++      }
++      return res.json();
++    }, { maxRetries: config.maxRetries, log });
++  }
++
++  return {
++    health:     ()        => apiPost('health', {}),
++    claim:      (topics)  => apiPost('claim', { topics }),
++    submitNote: (content) => apiPost('note', content),
++    submitArticle: (article) => apiPost('article', article),
++  };
++}

@@ -6,7 +6,7 @@ use EsotericCurrent\Core\Database\Schema;
 class Health_Controller {
     public static function register(): void {
         register_rest_route('ec/v1', '/health', [
-            'methods' => 'GET',
+            'methods' => ['GET', 'POST'],
             'callback' => [self::class, 'handle'],
             'permission_callback' => '__return_true',
         ]);

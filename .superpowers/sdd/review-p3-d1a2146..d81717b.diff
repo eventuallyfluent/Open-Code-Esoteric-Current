@@ -1,0 +1,90 @@
+﻿# Review package: d1a2146..d81717b
+
+## Commits
+d81717b feat(worker): HMAC signer, retry wrapper, WordPress REST client
+
+## Files changed
+ worker/src/utils/hmac.js  | 19 +++++++++++++++++++
+ worker/src/utils/retry.js | 12 ++++++++++++
+ worker/src/wordpress.js   | 29 +++++++++++++++++++++++++++++
+ 3 files changed, 60 insertions(+)
+
+## Diff
+diff --git a/worker/src/utils/hmac.js b/worker/src/utils/hmac.js
+new file mode 100644
+index 0000000..dc91dda
+--- /dev/null
++++ b/worker/src/utils/hmac.js
+@@ -0,0 +1,19 @@
++import { createHmac, randomBytes } from 'node:crypto';
++
++export function sign(payload, secret, nonce = randomBytes(16).toString('hex')) {
++  const timestamp = Math.floor(Date.now() / 1000);
++  const data = `${nonce}:${timestamp}:${JSON.stringify(payload)}`;
++  const signature = createHmac('sha256', secret).update(data).digest('hex');
++  return { nonce, timestamp, signature };
++}
++
++export function buildAuthHeaders(payload, apiKey, apiSecret) {
++  const { nonce, timestamp, signature } = sign(payload, apiSecret);
++  return {
++    'X-EC-Key': apiKey,
++    'X-EC-Nonce': nonce,
++    'X-EC-Timestamp': String(timestamp),
++    'X-EC-Signature': signature,
++    'Content-Type': 'application/json',
++  };
++}
+diff --git a/worker/src/utils/retry.js b/worker/src/utils/retry.js
+new file mode 100644
+index 0000000..66ffcc7
+--- /dev/null
++++ b/worker/src/utils/retry.js
+@@ -0,0 +1,12 @@
++export async function withRetry(fn, { maxRetries = 3, baseMs = 1000, log = console } = {}) {
++  for (let attempt = 0; attempt <= maxRetries; attempt++) {
++    try {
++      return await fn();
++    } catch (err) {
++      if (attempt === maxRetries) throw err;
++      const wait = baseMs * Math.pow(2, attempt) + Math.random() * 1000;
++      log.warn(`retry ${attempt + 1}/${maxRetries} after ${Math.round(wait)}ms: ${err.message}`);
++      await new Promise(r => setTimeout(r, wait));
++    }
++  }
++}
+diff --git a/worker/src/wordpress.js b/worker/src/wordpress.js
+new file mode 100644
+index 0000000..06c769b
+--- /dev/null
++++ b/worker/src/wordpress.js
+@@ -0,0 +1,29 @@
++import { buildAuthHeaders } from './utils/hmac.js';
++import { withRetry } from './utils/retry.js';
++
++export function createWordPressClient(config, log) {
++  async function apiPost(endpoint, payload) {
++    const url = new URL(`/wp-json/esoteric-current/v1/${endpoint}`, config.wordpressUrl).href;
++
++    return withRetry(async () => {
++      const headers = buildAuthHeaders(payload, config.wordpressApiKey, config.wordpressApiSecret);
++      const res = await fetch(url, {
++        method: 'POST',
++        headers,
++        body: JSON.stringify(payload),
++      });
++      if (!res.ok) {
++        const text = await res.text();
++        throw new Error(`WP API ${res.status}: ${text}`);
++      }
++      return res.json();
++    }, { maxRetries: config.maxRetries, log });
++  }
++
++  return {
++    health:     ()        => apiPost('health', {}),
++    claim:      (topics)  => apiPost('claim', { topics }),
++    submitNote: (content) => apiPost('note', content),
++    submitArticle: (article) => apiPost('article', article),
++  };
++}

@@ -15,7 +15,7 @@ class Claim_Controller {
     }
 
     public static function check_auth(\WP_REST_Request $request): bool {
-        $secret = defined('EC_CLAIM_SECRET') ? EC_CLAIM_SECRET : '';
+        $secret = defined('EC_API_SECRET') ? EC_API_SECRET : '';
         if (empty($secret)) {
             return false;
         }

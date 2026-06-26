@@ -9,7 +9,37 @@ class Feed_Client {
         $this->timeout = $seconds;
     }
 
+    private function validate_url(string $url): bool {
+        $parsed = wp_parse_url($url);
+        if ($parsed === false || empty($parsed['host'])) {
+            return false;
+        }
+
+        $host = $parsed['host'];
+        $ip = gethostbyname($host);
+
+        if ($ip === $host && !filter_var($ip, FILTER_VALIDATE_IP)) {
+            return false;
+        }
+
+        if (filter_var($ip, FILTER_VALIDATE_IP)) {
+            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                return true;
+            }
+            if ($ip === '0.0.0.0' || $ip === '::1') {
+                return false;
+            }
+            return false;
+        }
+
+        return true;
+    }
+
     public function fetch(string $feed_url): array {
+        if (!$this->validate_url($feed_url)) {
+            return ['success' => false, 'error' => 'URL rejected: invalid or private address'];
+        }
+
         $response = wp_remote_get($feed_url, [
             'timeout' => $this->timeout,
             'redirection' => $this->max_redirects,

@@ -1,0 +1,89 @@
+﻿# Review package: 1971cad..059bfd6
+
+## Commits
+059bfd6 fix(theme): add namespace-qualified function calls in masthead pattern
+3c135c2 feat(theme): template parts and masthead pattern
+
+## Files changed
+ theme/functions.php           |  4 ++++
+ theme/parts/masthead.html     |  6 ++++++
+ theme/parts/policy-strip.html |  7 +++++++
+ theme/parts/signals-rail.html |  7 +++++++
+ theme/patterns/masthead.php   | 11 +++++++++++
+ 5 files changed, 35 insertions(+)
+
+## Diff
+diff --git a/theme/functions.php b/theme/functions.php
+index c27f980..82685be 100644
+--- a/theme/functions.php
++++ b/theme/functions.php
+@@ -10,10 +10,14 @@ add_action('after_setup_theme', function () {
+     register_block_style('core/separator', [
+         'name' => 'ec-thin-rule',
+         'label' => __('Thin Rule', 'observatory-index'),
+     ]);
+ });
+ 
+ add_action('wp_enqueue_scripts', function () {
+     wp_enqueue_style('observatory-index-google-fonts', 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@400;600;700&display=swap', [], null);
+     wp_enqueue_style('observatory-index-theme', get_template_directory_uri() . '/assets/theme.css', ['observatory-index-google-fonts'], wp_get_theme()->get('Version'));
+ });
++
++add_action('init', function () {
++    require_once get_template_directory() . '/patterns/masthead.php';
++});
+diff --git a/theme/parts/masthead.html b/theme/parts/masthead.html
+new file mode 100644
+index 0000000..ff11191
+--- /dev/null
++++ b/theme/parts/masthead.html
+@@ -0,0 +1,6 @@
++<!-- wp:group {"style":{"color":{"background":"#000000"},"spacing":{"padding":{"top":"4rem","bottom":"4rem"}}},"textColor":"white","layout":{"type":"constrained"}} -->
++<div class="wp-block-group has-white-color has-black-background-color has-text-color has-background" style="padding-top:4rem;padding-bottom:4rem">
++    <!-- wp:site-title {"textAlign":"center","style":{"typography":{"fontSize":"3rem","fontStyle":"normal","fontWeight":"700"}}} /-->
++    <!-- wp:site-tagline {"textAlign":"center","style":{"typography":{"fontSize":"1rem"}},"textColor":"muted-gold"} /-->
++</div>
++<!-- /wp:group -->
+diff --git a/theme/parts/policy-strip.html b/theme/parts/policy-strip.html
+new file mode 100644
+index 0000000..6bdff7c
+--- /dev/null
++++ b/theme/parts/policy-strip.html
+@@ -0,0 +1,7 @@
++<!-- wp:group {"style":{"color":{"background":"#2C2C2C"},"spacing":{"padding":{"top":"0.5rem","bottom":"0.5rem"}}},"textColor":"light-gray","fontSize":"small","layout":{"type":"flex","flexWrap":"wrap","justifyContent":"center"}} -->
++<div class="wp-block-group has-light-gray-color has-charcoal-background-color has-text-color has-background has-small-font-size" style="padding-top:0.5rem;padding-bottom:0.5rem">
++    <!-- wp:paragraph {"style":{"typography":{"fontSize":"0.75rem"}}} -->
++    <p style="font-size:0.75rem">All content is curated. Views expressed are those of the authors.</p>
++    <!-- /wp:paragraph -->
++</div>
++<!-- /wp:group -->
+diff --git a/theme/parts/signals-rail.html b/theme/parts/signals-rail.html
+new file mode 100644
+index 0000000..381016b
+--- /dev/null
++++ b/theme/parts/signals-rail.html
+@@ -0,0 +1,7 @@
++<!-- wp:group {"style":{"color":{"background":"#1A2238"},"spacing":{"padding":{"top":"0.75rem","bottom":"0.75rem"}}},"textColor":"warm-white","layout":{"type":"constrained"}} -->
++<div class="wp-block-group has-warm-white-color has-dark-navy-background-color has-text-color has-background" style="padding-top:0.75rem;padding-bottom:0.75rem">
++    <!-- wp:paragraph {"align":"center","fontSize":"small"} -->
++    <p class="has-text-align-center has-small-font-size">Latest signals will appear here</p>
++    <!-- /wp:paragraph -->
++</div>
++<!-- /wp:group -->
+diff --git a/theme/patterns/masthead.php b/theme/patterns/masthead.php
+new file mode 100644
+index 0000000..f1d6b43
+--- /dev/null
++++ b/theme/patterns/masthead.php
+@@ -0,0 +1,11 @@
++<?php
++\register_block_pattern('observatory-index/masthead', [
++    'title' => \__('Masthead', 'observatory-index'),
++    'description' => \__('Site masthead with title and tagline.', 'observatory-index'),
++    'content' => '<!-- wp:group {"style":{"color":{"background":"#000000"},"spacing":{"padding":{"top":"4rem","bottom":"4rem"}}},"textColor":"white","layout":{"type":"constrained"}} -->
++<div class="wp-block-group has-white-color has-black-background-color has-text-color has-background" style="padding-top:4rem;padding-bottom:4rem">
++    <!-- wp:site-title {"textAlign":"center","style":{"typography":{"fontSize":"3rem"}}} /-->
++    <!-- wp:site-tagline {"textAlign":"center","textColor":"muted-gold"} /-->
++</div>
++<!-- /wp:group -->',
++]);

@@ -1,0 +1,258 @@
+﻿# Review package: 3b5ed75..0067d2a
+
+## Commits
+0067d2a feat(theme): scaffold block theme with theme.json, templates, parts
+
+## Files changed
+ theme/assets/editor.css    |   2 +
+ theme/assets/theme.css     |   7 +++
+ theme/functions.php        |  19 +++++++
+ theme/parts/footer.html    |   7 +++
+ theme/parts/header.html    |  10 ++++
+ theme/screenshot.png       | Bin 0 -> 67 bytes
+ theme/style.css            |  12 +++++
+ theme/templates/index.html |  10 ++++
+ theme/theme.json           | 121 +++++++++++++++++++++++++++++++++++++++++++++
+ 9 files changed, 188 insertions(+)
+
+## Diff
+diff --git a/theme/assets/editor.css b/theme/assets/editor.css
+new file mode 100644
+index 0000000..331a1e8
+--- /dev/null
++++ b/theme/assets/editor.css
+@@ -0,0 +1,2 @@
++body { font-family: Inter, sans-serif; line-height: 1.7; }
++h1, h2, h3, h4 { font-family: 'Playfair Display', serif; }
+diff --git a/theme/assets/theme.css b/theme/assets/theme.css
+new file mode 100644
+index 0000000..dc2c66b
+--- /dev/null
++++ b/theme/assets/theme.css
+@@ -0,0 +1,7 @@
++:root {
++  --ec-rule-height: 1px;
++  --ec-card-border: 1px solid #e8e4dc;
++  --ec-transition: 200ms ease;
++}
++.wp-site-blocks { max-width: 100%; }
++.ec-thin-rule { height: var(--ec-rule-height); background: #c8a84e; }
+diff --git a/theme/functions.php b/theme/functions.php
+new file mode 100644
+index 0000000..c27f980
+--- /dev/null
++++ b/theme/functions.php
+@@ -0,0 +1,19 @@
++<?php
++namespace ObservatoryIndex;
++
++add_action('after_setup_theme', function () {
++    add_editor_style('assets/editor.css');
++    add_theme_support('wp-block-styles');
++    add_theme_support('align-wide');
++    add_theme_support('responsive-embeds');
++
++    register_block_style('core/separator', [
++        'name' => 'ec-thin-rule',
++        'label' => __('Thin Rule', 'observatory-index'),
++    ]);
++});
++
++add_action('wp_enqueue_scripts', function () {
++    wp_enqueue_style('observatory-index-google-fonts', 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@400;600;700&display=swap', [], null);
++    wp_enqueue_style('observatory-index-theme', get_template_directory_uri() . '/assets/theme.css', ['observatory-index-google-fonts'], wp_get_theme()->get('Version'));
++});
+diff --git a/theme/parts/footer.html b/theme/parts/footer.html
+new file mode 100644
+index 0000000..1c95242
+--- /dev/null
++++ b/theme/parts/footer.html
+@@ -0,0 +1,7 @@
++<!-- wp:group {"style":{"color":{"background":"#000000"},"spacing":{"padding":{"top":"2rem","bottom":"2rem"}}},"textColor":"white","layout":{"type":"constrained"}} -->
++<div class="wp-block-group has-white-color has-black-background-color has-text-color has-background" style="padding-top:2rem;padding-bottom:2rem">
++    <!-- wp:paragraph {"align":"center","fontSize":"small"} -->
++    <p class="has-text-align-center has-small-font-size">┬⌐ 2026 The Esoteric Current. All rights reserved.</p>
++    <!-- /wp:paragraph -->
++</div>
++<!-- /wp:group -->
+diff --git a/theme/parts/header.html b/theme/parts/header.html
+new file mode 100644
+index 0000000..a29fac1
+--- /dev/null
++++ b/theme/parts/header.html
+@@ -0,0 +1,10 @@
++<!-- wp:group {"style":{"color":{"background":"#000000"}},"layout":{"type":"constrained"}} -->
++<div class="wp-block-group has-black-background-color has-background">
++    <!-- wp:group {"layout":{"type":"flex","flexWrap":"nowrap","justifyContent":"space-between"},"style":{"spacing":{"padding":{"top":"1rem","bottom":"1rem"}}}} -->
++    <div class="wp-block-group" style="padding-top:1rem;padding-bottom:1rem">
++        <!-- wp:site-title /-->
++        <!-- wp:navigation /-->
++    </div>
++    <!-- /wp:group -->
++</div>
++<!-- /wp:group -->
+diff --git a/theme/screenshot.png b/theme/screenshot.png
+new file mode 100644
+index 0000000..8c3bb35
+Binary files /dev/null and b/theme/screenshot.png differ
+diff --git a/theme/style.css b/theme/style.css
+new file mode 100644
+index 0000000..e57ca77
+--- /dev/null
++++ b/theme/style.css
+@@ -0,0 +1,12 @@
++/*
++Theme Name: Observatory Index
++Theme URI: https://theesotericcurrent.com
++Description: A prestige block theme for The Esoteric Current ΓÇö automated esoteric research publication.
++Author: The Esoteric Current
++Version: 1.0.0
++Requires at least: 6.4
++Tested up to: 6.6
++Requires PHP: 8.1
++License: GPLv2 or later
++Text Domain: observatory-index
++*/
+diff --git a/theme/templates/index.html b/theme/templates/index.html
+new file mode 100644
+index 0000000..b5c0205
+--- /dev/null
++++ b/theme/templates/index.html
+@@ -0,0 +1,10 @@
++<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
++<!-- wp:group {"tagName":"main","layout":{"type":"constrained"},"style":{"spacing":{"padding":{"top":"3rem","bottom":"3rem"}}}} -->
++<main class="wp-block-group" style="padding-top:3rem;padding-bottom:3rem">
++    <!-- wp:heading {"level":1,"textAlign":"center"} -->
++    <h1 class="wp-block-heading has-text-align-center">The Esoteric Current</h1>
++    <!-- /wp:heading -->
++    <!-- wp:post-content /-->
++</main>
++<!-- /wp:group -->
++<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->
+diff --git a/theme/theme.json b/theme/theme.json
+new file mode 100644
+index 0000000..748827a
+--- /dev/null
++++ b/theme/theme.json
+@@ -0,0 +1,121 @@
++{
++  "$schema": "https://schemas.wp.org/trunk/theme.json",
++  "version": 2,
++  "settings": {
++    "appearanceTools": true,
++    "color": {
++      "palette": [
++        { "slug": "black", "color": "#000000", "name": "Black" },
++        { "slug": "warm-white", "color": "#F5F0E8", "name": "Warm White" },
++        { "slug": "muted-gold", "color": "#C8A84E", "name": "Muted Gold" },
++        { "slug": "deep-burgundy", "color": "#6B1D2F", "name": "Deep Burgundy" },
++        { "slug": "dark-navy", "color": "#1A2238", "name": "Dark Navy" },
++        { "slug": "charcoal", "color": "#2C2C2C", "name": "Charcoal" },
++        { "slug": "light-gray", "color": "#E8E4DC", "name": "Light Gray" },
++        { "slug": "white", "color": "#FFFFFF", "name": "White" }
++      ],
++      "duotone": [
++        {
++          "slug": "gold-burgundy",
++          "colors": [ "#1A2238", "#C8A84E" ],
++          "name": "Gold on Navy"
++        }
++      ]
++    },
++    "typography": {
++      "fontFamilies": [
++        {
++          "slug": "serif",
++          "name": "Serif",
++          "fontFamily": "'Playfair Display', Georgia, 'Times New Roman', serif"
++        },
++        {
++          "slug": "sans",
++          "name": "Sans-Serif",
++          "fontFamily": "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
++        },
++        {
++          "slug": "mono",
++          "name": "Monospace",
++          "fontFamily": "'JetBrains Mono', 'Fira Code', monospace"
++        }
++      ],
++      "fluid": true,
++      "fontSizes": [
++        { "slug": "small", "size": "0.875rem", "fluid": { "min": "0.875rem", "max": "1rem" } },
++        { "slug": "medium", "size": "1rem", "fluid": { "min": "1rem", "max": "1.125rem" } },
++        { "slug": "large", "size": "1.25rem", "fluid": { "min": "1.125rem", "max": "1.5rem" } },
++        { "slug": "x-large", "size": "1.75rem", "fluid": { "min": "1.5rem", "max": "2rem" } },
++        { "slug": "xx-large", "size": "2.5rem", "fluid": { "min": "2rem", "max": "3rem" } }
++      ],
++      "dropCap": false
++    },
++    "layout": {
++      "contentSize": "720px",
++      "wideSize": "1140px"
++    },
++    "spacing": {
++      "padding": true,
++      "margin": true,
++      "units": ["px", "em", "rem", "vh", "vw", "%"]
++    }
++  },
++  "styles": {
++    "color": {
++      "background": "var(--wp--preset--color--warm-white)",
++      "text": "var(--wp--preset--color--charcoal)"
++    },
++    "typography": {
++      "fontFamily": "var(--wp--preset--font-family--sans)",
++      "lineHeight": 1.7
++    },
++    "elements": {
++      "h1": { "typography": { "fontFamily": "var(--wp--preset--font-family--serif)", "fontSize": "var(--wp--preset--font-size--xx-large)", "lineHeight": 1.2 } },
++      "h2": { "typography": { "fontFamily": "var(--wp--preset--font-family--serif)", "fontSize": "var(--wp--preset--font-size--x-large)", "lineHeight": 1.25 } },
++      "h3": { "typography": { "fontFamily": "var(--wp--preset--font-family--serif)", "fontSize": "var(--wp--preset--font-size--large)", "lineHeight": 1.3 } },
++      "h4": { "typography": { "fontFamily": "var(--wp--preset--font-family--serif)", "lineHeight": 1.35 } },
++      "h5": { "typography": { "fontFamily": "var(--wp--preset--font-family--serif)", "lineHeight": 1.4 } },
++      "h6": { "typography": { "fontFamily": "var(--wp--preset--font-family--serif)", "lineHeight": 1.4 } },
++      "link": {
++        "color": { "text": "var(--wp--preset--color--deep-burgundy)" },
++        ":hover": { "color": { "text": "var(--wp--preset--color--muted-gold)" } }
++      },
++      "button": {
++        "color": { "background": "var(--wp--preset--color--black)", "text": "var(--wp--preset--color--white)" },
++        "typography": { "fontFamily": "var(--wp--preset--font-family--sans)" },
++        "spacing": { "padding": { "top": "0.75rem", "bottom": "0.75rem", "left": "1.5rem", "right": "1.5rem" } },
++        "border": { "radius": "0" }
++      }
++    },
++    "blocks": {
++      "core/site-title": {
++        "typography": { "fontFamily": "var(--wp--preset--font-family--serif)", "fontSize": "var(--wp--preset--font-size--x-large)" },
++        "color": { "text": "var(--wp--preset--color--white)" }
++      },
++      "core/post-title": {
++        "typography": { "fontFamily": "var(--wp--preset--font-family--serif)" }
++      },
++      "core/navigation": {
++        "typography": { "fontFamily": "var(--wp--preset--font-family--sans)", "fontSize": "var(--wp--preset--font-size--small)" },
++        "color": { "text": "var(--wp--preset--color--white)" }
++      },
++      "core/separator": {
++        "color": { "background": "var(--wp--preset--color--muted-gold)" },
++        "spacing": { "margin": { "top": "2rem", "bottom": "2rem" } }
++      },
++      "core/query-pagination": {
++        "typography": { "fontFamily": "var(--wp--preset--font-family--sans)", "fontSize": "var(--wp--preset--font-size--small)" }
++      }
++    }
++  },
++  "customTemplates": [
++    { "name": "submission", "title": "Submission", "postTypes": ["page"] }
++  ],
++  "templateParts": [
++    { "name": "header", "title": "Header", "area": "header" },
++    { "name": "footer", "title": "Footer", "area": "footer" },
++    { "name": "masthead", "title": "Masthead", "area": "uncategorized" },
++    { "name": "signals-rail", "title": "Signals Rail", "area": "uncategorized" },
++    { "name": "policy-strip", "title": "Policy Strip", "area": "uncategorized" }
++  ]
++}

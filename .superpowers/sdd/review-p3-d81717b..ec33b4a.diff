@@ -1,0 +1,126 @@
+﻿# Review package: d81717b..ec33b4a
+
+## Commits
+ec33b4a feat(worker): DeepSeek client and agent implementations ΓÇö research, collector, synthesizer
+
+## Files changed
+ worker/src/agents/collector.js   | 19 +++++++++++++++++++
+ worker/src/agents/research.js    | 21 +++++++++++++++++++++
+ worker/src/agents/synthesizer.js | 19 +++++++++++++++++++
+ worker/src/deepseek.js           | 30 ++++++++++++++++++++++++++++++
+ 4 files changed, 89 insertions(+)
+
+## Diff
+diff --git a/worker/src/agents/collector.js b/worker/src/agents/collector.js
+new file mode 100644
+index 0000000..9961a26
+--- /dev/null
++++ b/worker/src/agents/collector.js
+@@ -0,0 +1,19 @@
++export function createCollectorAgent(deepseek) {
++  return {
++    async deepDive(topic) {
++      const systemPrompt = `You are a research assistant compiling a briefing on an esoteric topic. Return a JSON object with: title (string), summary (string, 2-3 paragraphs), key_points (array of strings), sources (array of {title, url?, relevance}), related_traditions (array of strings), significance_score (number 0-1). Be specific and cite verifiable information.`;
++
++      const res = await deepseek.chat([
++        { role: 'system', content: systemPrompt },
++        { role: 'user', content: `Compile a detailed briefing on: ${topic.title} ΓÇö ${topic.reason}` },
++      ], { temperature: 0.6, maxTokens: 8192 });
++
++      const text = res.choices?.[0]?.message?.content || '{}';
++      try {
++        return JSON.parse(text.replace(/```(?:json)?\n?/g, '').trim());
++      } catch {
++        return null;
++      }
++    },
++  };
++}
+diff --git a/worker/src/agents/research.js b/worker/src/agents/research.js
+new file mode 100644
+index 0000000..a590ac8
+--- /dev/null
++++ b/worker/src/agents/research.js
+@@ -0,0 +1,21 @@
++export function createResearchAgent(deepseek) {
++  return {
++    async discoverTopics(categories = []) {
++      const systemPrompt = `You are a research librarian specializing in esoteric studies. Your role: identify noteworthy current developments, publications, discussions, and emerging topics in esoteric traditions. Categories: ${categories.join(', ')}.
++
++Return a JSON array of objects with: title (string), category (string), reason (string ΓÇö why this is noteworthy now), confidence (number 0-1). Maximum 5 items.`;
++
++      const res = await deepseek.chat([
++        { role: 'system', content: systemPrompt },
++        { role: 'user', content: 'What is currently noteworthy in esoteric studies?' },
++      ], { temperature: 0.8 });
++
++      const text = res.choices?.[0]?.message?.content || '[]';
++      try {
++        return JSON.parse(text.replace(/```(?:json)?\n?/g, '').trim());
++      } catch {
++        return [];
++      }
++    },
++  };
++}
+diff --git a/worker/src/agents/synthesizer.js b/worker/src/agents/synthesizer.js
+new file mode 100644
+index 0000000..ae0c8c5
+--- /dev/null
++++ b/worker/src/agents/synthesizer.js
+@@ -0,0 +1,19 @@
++export function createSynthesizerAgent(deepseek) {
++  return {
++    async synthesize(briefing) {
++      const systemPrompt = `You are a senior editor at an esoteric publication. Format the following research briefing into a publishable article. Return JSON: title, content (HTML-formatted article body, 800-1200 words), excerpt (1-2 sentences), tags (array of strings), estimated_reading_time_minutes (number). Tone: authoritative, clear, slightly formal. Use <h2> for section breaks, <blockquote> for notable quotes.`;
++
++      const res = await deepseek.chat([
++        { role: 'system', content: systemPrompt },
++        { role: 'user', content: JSON.stringify(briefing, null, 2) },
++      ], { temperature: 0.5, maxTokens: 16384 });
++
++      const text = res.choices?.[0]?.message?.content || '{}';
++      try {
++        return JSON.parse(text.replace(/```(?:json)?\n?/g, '').trim());
++      } catch {
++        return null;
++      }
++    },
++  };
++}
+diff --git a/worker/src/deepseek.js b/worker/src/deepseek.js
+new file mode 100644
+index 0000000..f7c05bd
+--- /dev/null
++++ b/worker/src/deepseek.js
+@@ -0,0 +1,30 @@
++import { withRetry } from './utils/retry.js';
++
++export function createDeepSeekClient(config, log) {
++  async function chat(messages, options = {}) {
++    const { model = config.deepseekModel, temperature = 0.7, maxTokens = 4096 } = options;
++
++    return withRetry(async () => {
++      const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
++        method: 'POST',
++        headers: {
++          'Authorization': `Bearer ${config.deepseekApiKey}`,
++          'Content-Type': 'application/json',
++        },
++        body: JSON.stringify({
++          model,
++          messages,
++          temperature,
++          max_tokens: maxTokens,
++        }),
++      });
++      if (!res.ok) {
++        const text = await res.text();
++        throw new Error(`DeepSeek API ${res.status}: ${text}`);
++      }
++      return res.json();
++    }, { maxRetries: config.maxRetries, log });
++  }
++
++  return { chat };
++}

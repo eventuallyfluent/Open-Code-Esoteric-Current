@@ -3,6 +3,7 @@ namespace EsotericCurrent\Core;
 
 use EsotericCurrent\Core\Admin\Admin_Menu;
 use EsotericCurrent\Core\Admin\Settings_Page;
+use EsotericCurrent\Core\Api\Article_Controller;
 use EsotericCurrent\Core\Api\Callback_Controller;
 use EsotericCurrent\Core\Api\Claim_Controller;
 use EsotericCurrent\Core\Api\Health_Controller;
@@ -28,6 +29,7 @@ class Plugin {
         add_action('init', [Schema::class, 'migrate']);
         add_action('rest_api_init', [Health_Controller::class, 'register']);
         add_action('rest_api_init', [Claim_Controller::class, 'register']);
+        add_action('rest_api_init', [Article_Controller::class, 'register']);
         add_action('rest_api_init', [Callback_Controller::class, 'register']);
         add_action('admin_menu', [Admin_Menu::class, 'register']);
         add_action('admin_init', [Settings_Page::class, 'register_settings']);

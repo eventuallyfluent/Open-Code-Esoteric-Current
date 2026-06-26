@@ -1,3 +1,11 @@
+﻿### Task 4: Orchestrator (index.js) â€” connect the pipeline
+
+**Files:**
+- Modify: `C:\Dev\Open Code Esoteric Current\worker\src\index.js`
+
+- [ ] **Step 1: Rewrite index.js with full orchestration**
+
+```javascript
 import { loadConfig } from './config.js';
 import { createLogger } from './utils/logger.js';
 import { createDeepSeekClient } from './deepseek.js';
@@ -7,10 +15,21 @@ import { createCollectorAgent } from './agents/collector.js';
 import { createSynthesizerAgent } from './agents/synthesizer.js';
 
 const ESOTERIC_CATEGORIES = [
-  'Hermeticism', 'Alchemy', 'Astrology', 'Ceremonial Magic',
-  'Kabbalah', 'Gnosticism', 'Dzogchen', 'Shamanism', 'Tantra',
-  'Sufism', 'Mysticism', 'Esoteric Christianity', 'Theosophy',
-  'Rosicrucianism', 'Neoplatonism',
+  'Hermeticism',
+  'Alchemy',
+  'Astrology',
+  'Ceremonial Magic',
+  'Kabbalah',
+  'Gnosticism',
+  'Dzogchen',
+  'Shamanism',
+  'Tantra',
+  'Sufism',
+  'Mysticism',
+  'Esoteric Christianity',
+  'Theosophy',
+  'Rosicrucianism',
+  'Neoplatonism',
 ];
 
 async function main() {
@@ -19,19 +38,21 @@ async function main() {
 
   log.info('worker-start', { dryRun: config.dryRun, model: config.deepseekModel });
 
+  // Check WordPress connectivity
   const wp = createWordPressClient(config, log);
   const deepseek = createDeepSeekClient(config, log);
 
   if (!config.dryRun) {
     try {
-      const health = await wp.health();
-      log.info('wp-health-ok', { version: health.version });
+      await wp.health();
+      log.info('wp-health-ok');
     } catch (err) {
       log.error('wp-health-failed', err.message);
       process.exit(1);
     }
   }
 
+  // Phase 1: Research
   log.info('phase-research-start');
   const research = createResearchAgent(deepseek);
   let topics;
@@ -45,27 +66,24 @@ async function main() {
     log.info('phase-research-complete', { count: topics.length });
   }
 
-  let claimedTopics = [];
+  // Phase 2: Claim topics with WordPress
+  let claimResult;
   if (!config.dryRun && topics.length > 0) {
-    const claimResult = await wp.claim(topics);
-    if (claimResult.claimed && claimResult.topic) {
-      claimedTopics = [claimResult.topic];
-      log.info('topics-claimed', { topic: claimResult.topic.title, runUuid: claimResult.run_uuid });
-    } else {
-      log.info('no-topics-to-claim', { message: claimResult.message });
-    }
-  } else if (config.dryRun) {
-    claimedTopics = topics;
+    claimResult = await wp.claim(topics);
+    log.info('topics-claimed', { count: topics.length, claimed: claimResult?.claimed?.length ?? 0 });
   }
 
+  // Phase 3: Collect + Synthesize for each topic
   const collector = createCollectorAgent(deepseek);
   const synthesizer = createSynthesizerAgent(deepseek);
 
   const articles = [];
+  const topicsToProcess = config.dryRun ? topics : (claimResult?.claimed ?? topics);
 
-  for (const topic of claimedTopics) {
+  for (const topic of topicsToProcess) {
     log.info('process-topic', { title: topic.title });
 
+    // Collect
     const briefing = await collector.deepDive(topic);
     if (!briefing) {
       log.warn('collect-failed', { title: topic.title });
@@ -73,6 +91,7 @@ async function main() {
     }
     log.info('collect-complete', { title: topic.title, keyPoints: briefing.key_points?.length ?? 0 });
 
+    // Synthesize
     const article = await synthesizer.synthesize(briefing);
     if (!article) {
       log.warn('synthesize-failed', { title: topic.title });
@@ -82,6 +101,7 @@ async function main() {
 
     articles.push({ ...article, _briefing: briefing });
 
+    // Submit to WordPress
     if (!config.dryRun) {
       await wp.submitArticle({
         title: article.title,
@@ -102,3 +122,13 @@ main().catch(err => {
   console.error(JSON.stringify({ l: 'error', t: new Date().toISOString(), m: err.message, stack: err.stack }));
   process.exit(1);
 });
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add worker/src/index.js
+git commit -m "feat(worker): full orchestration pipeline â€” research â†’ claim â†’ collect â†’ synthesize â†’ submit"
+```
+
+---

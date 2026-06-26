@@ -15,7 +15,7 @@ class Callback_Controller {
     }
 
     public static function check_auth(\WP_REST_Request $request): bool {
-        $secret = defined('EC_CALLBACK_SECRET') ? EC_CALLBACK_SECRET : '';
+        $secret = defined('EC_API_SECRET') ? EC_API_SECRET : '';
         if (empty($secret)) {
             return false;
         }
