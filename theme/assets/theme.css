@@ -1298,3 +1298,73 @@ input:focus-visible {
   :root { --ec-header-h: 60px; }
   .ec-container { padding: 0 1rem; }
 }
+
+/* === Flag / Report Button === */
+.ec-flag-btn {
+  background: none;
+  border: none;
+  color: var(--ec-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  opacity: 0.4;
+  transition: opacity var(--ec-transition);
+}
+.ec-flag-btn:hover {
+  opacity: 1;
+  color: var(--ec-gold);
+}
+.ec-flag-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ec-flag-modal-content {
+  background: var(--ec-panel);
+  border: 1px solid var(--ec-border);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+}
+.ec-flag-modal-title {
+  font-size: 1rem;
+  margin: 0 0 4px;
+}
+.ec-flag-modal-desc {
+  font-size: 0.8125rem;
+  color: var(--ec-muted);
+  margin: 0 0 16px;
+}
+.ec-flag-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.ec-flag-option {
+  padding: 10px;
+  border: 1px solid var(--ec-border);
+  border-radius: 6px;
+  background: var(--ec-bg);
+  color: var(--ec-text);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: border-color var(--ec-transition);
+}
+.ec-flag-option:hover {
+  border-color: var(--ec-gold);
+}
+.ec-flag-cancel {
+  background: none;
+  border: none;
+  color: var(--ec-muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+}

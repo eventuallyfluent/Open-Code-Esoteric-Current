@@ -41,6 +41,62 @@ class Editorial_Feed_Block {
         } else {
             self::render_list($items, $show_excerpt);
         }
+        ?>
+<div id="ec-flag-modal" class="ec-flag-modal" style="display:none">
+    <div class="ec-flag-modal-content">
+        <p class="ec-flag-modal-title">Report issue</p>
+        <p class="ec-flag-modal-desc">Why is this finding problematic?</p>
+        <div class="ec-flag-options">
+            <button class="ec-flag-option" data-reason="low-quality">Low-quality source</button>
+            <button class="ec-flag-option" data-reason="wrong-category">Wrong category</button>
+            <button class="ec-flag-option" data-reason="broken-link">Broken link</button>
+            <button class="ec-flag-option" data-reason="other">Other</button>
+        </div>
+        <button class="ec-flag-cancel">Cancel</button>
+    </div>
+</div>
+<script>
+(function(){
+    var modal = document.getElementById('ec-flag-modal');
+    var currentId = null;
+    document.querySelectorAll('.ec-flag-btn').forEach(function(btn){
+        btn.addEventListener('click', function(e){
+            e.stopPropagation();
+            currentId = this.getAttribute('data-finding-id');
+            modal.style.display = 'flex';
+        });
+    });
+    document.querySelectorAll('.ec-flag-option').forEach(function(opt){
+        opt.addEventListener('click', function(){
+            var reason = this.getAttribute('data-reason');
+            if (!currentId) return;
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '<?php echo esc_url_raw(rest_url('ec/v1/finding/')); ?>' + currentId + '/flag');
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onload = function(){
+                modal.style.display = 'none';
+                if (xhr.status === 201) {
+                    alert('Thank you. We\'ll review this.');
+                } else {
+                    alert('Could not submit flag. Please try again later.');
+                }
+            };
+            xhr.onerror = function(){
+                modal.style.display = 'none';
+                alert('Could not submit flag. Please try again later.');
+            };
+            xhr.send(JSON.stringify({reason: reason}));
+        });
+    });
+    document.querySelector('.ec-flag-cancel').addEventListener('click', function(){
+        modal.style.display = 'none';
+    });
+    modal.addEventListener('click', function(e){
+        if (e.target === modal) modal.style.display = 'none';
+    });
+})();
+</script>
+<?php
         return ob_get_clean();
     }
 
@@ -77,6 +133,7 @@ class Editorial_Feed_Block {
                                 <?php echo self::relative_time($item->created_at); ?>
                             </time>
                         <?php endif; ?>
+                        <button class="ec-flag-btn" data-finding-id="<?php echo (int)$item->source_id; ?>" type="button" title="Report issue" aria-label="Report issue with this finding">⚑</button>
                     </div>
                     <?php if (!empty($item->relevance_score)): ?>
                         <div class="ec-feed-card-relevance" aria-label="Relevance: <?php echo esc_attr($item->relevance_score); ?>%">
@@ -107,6 +164,7 @@ class Editorial_Feed_Block {
                         <?php if (!empty($item->created_at)): ?>
                             <time><?php echo self::relative_time($item->created_at); ?></time>
                         <?php endif; ?>
+                        <button class="ec-flag-btn" data-finding-id="<?php echo (int)$item->source_id; ?>" type="button" title="Report issue" aria-label="Report issue with this finding">⚑</button>
                     </div>
                 </li>
             <?php endforeach; ?>
