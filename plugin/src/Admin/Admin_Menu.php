@@ -18,6 +18,7 @@ class Admin_Menu {
             'ec-research-topics' => ['Research Briefs', Research_Topics_Page::class],
             'ec-agent-runs'      => ['Agent Runs', Agent_Runs_Page::class],
             'ec-findings'        => ['Findings', Findings_Page::class],
+            'ec-flags'           => ['Flags', Flags_Page::class],
             'ec-sources'         => ['Sources', Sources_Page::class],
             'ec-editorial'       => ['Editorial Queue', Editorial_Queue_Page::class],
             'ec-resources'       => ['Resources', Resources_Page::class],
