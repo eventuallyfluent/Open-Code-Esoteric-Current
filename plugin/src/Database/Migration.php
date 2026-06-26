@@ -36,6 +36,11 @@ class Migration {
         $this->create_run_log_table($wpdb);
     }
 
+    public function migrate_1_3_0(): void {
+        global $wpdb;
+        $this->create_finding_flags_table($wpdb);
+    }
+
     private function create_sources_table($wpdb): void {
         $table = $wpdb->prefix . 'ec_sources';
         $sql = "CREATE TABLE {$table} (
@@ -272,5 +277,23 @@ class Migration {
             KEY idx_created_at (created_at)
         ) " . self::CHARSET;
         dbDelta($sql);
+    }
+
+    private function create_finding_flags_table($wpdb): void {
+        $table = $wpdb->prefix . 'ec_finding_flags';
+        $sql = "CREATE TABLE IF NOT EXISTS {$table} (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            finding_id BIGINT UNSIGNED NOT NULL,
+            reason VARCHAR(50) NOT NULL DEFAULT 'other',
+            ip_address VARCHAR(45) NOT NULL DEFAULT '',
+            user_agent VARCHAR(512) NOT NULL DEFAULT '',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            reviewed_at DATETIME DEFAULT NULL,
+            reviewed_by VARCHAR(60) DEFAULT NULL,
+            action_taken VARCHAR(50) DEFAULT NULL,
+            KEY idx_finding_id (finding_id),
+            KEY idx_unreviewed (reviewed_at)
+        ) " . self::CHARSET;
+        $wpdb->query($sql);
     }
 }

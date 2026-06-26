@@ -25,6 +25,6 @@ class Schema {
     }
 
     private static function get_migration_versions(): array {
-        return ['1.0.0', '1.0.1'];
+        return ['1.0.0', '1.0.1', '1.3.0'];
     }
 }
