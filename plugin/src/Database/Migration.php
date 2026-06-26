@@ -36,8 +36,13 @@ class Migration {
         $this->create_run_log_table($wpdb);
     }
 
+    public function migrate_1_2_0(): void {
+        // Placeholder — no structural changes.
+    }
+
     public function migrate_1_3_0(): void {
         global $wpdb;
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         $this->create_finding_flags_table($wpdb);
     }
 
@@ -281,19 +286,17 @@ class Migration {
 
     private function create_finding_flags_table($wpdb): void {
         $table = $wpdb->prefix . 'ec_finding_flags';
-        $sql = "CREATE TABLE IF NOT EXISTS {$table} (
+        $sql = "CREATE TABLE {$table} (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             finding_id BIGINT UNSIGNED NOT NULL,
             reason VARCHAR(50) NOT NULL DEFAULT 'other',
             ip_address VARCHAR(45) NOT NULL DEFAULT '',
-            user_agent VARCHAR(512) NOT NULL DEFAULT '',
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            reviewed_at DATETIME DEFAULT NULL,
-            reviewed_by VARCHAR(60) DEFAULT NULL,
-            action_taken VARCHAR(50) DEFAULT NULL,
+            reviewed TINYINT(1) NOT NULL DEFAULT 0,
             KEY idx_finding_id (finding_id),
-            KEY idx_unreviewed (reviewed_at)
+            KEY idx_reviewed (reviewed),
+            KEY idx_created_at (created_at)
         ) " . self::CHARSET;
-        $wpdb->query($sql);
+        dbDelta($sql);
     }
 }
