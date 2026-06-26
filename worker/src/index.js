@@ -16,6 +16,7 @@ const ESOTERIC_CATEGORIES = [
 const BLOCKED_DOMAINS = new Set([
   'wikipedia.org',
   'archive.org',
+  'encyclopedia.com',
   'britannica.com',
 ]);
 
@@ -68,7 +69,7 @@ async function main() {
   const collector = createCollectorAgent(deepseek);
   const synthesizer = createSynthesizerAgent(deepseek);
 
-  function filterBriefingSources(briefing, log) {
+  function filterBriefingSources(briefing, topicTitle, log) {
     if (!briefing.sources || !Array.isArray(briefing.sources)) return;
     const before = briefing.sources.length;
     briefing.sources = briefing.sources.filter(src => {
@@ -83,13 +84,13 @@ async function main() {
         hostname === domain || hostname.endsWith('.' + domain)
       );
       if (blocked) {
-        log.debug('source-blocked', { url: src.url, title: src.title, domain: hostname });
+        log.debug('source-blocked', { url: src.url, title: src.title, domain: hostname, topic: topicTitle });
       }
       return !blocked;
     });
     const filtered = before - briefing.sources.length;
     if (filtered > 0) {
-      log.info('sources-filtered', { before, after: briefing.sources.length, filtered });
+      log.info('sources-filtered', { topic: topicTitle, before, after: briefing.sources.length, filtered });
     }
   }
 
@@ -107,7 +108,7 @@ async function main() {
     }
     log.info('collect-complete', { title: topic.title, keyPoints: briefing.key_points?.length ?? 0, sourcesBeforeFilter: briefing.sources?.length ?? 0 });
 
-    filterBriefingSources(briefing, log);
+    filterBriefingSources(briefing, topic.title, log);
 
     const article = await synthesizer.synthesize(briefing);
     if (!article) {

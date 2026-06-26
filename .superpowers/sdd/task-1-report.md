@@ -1,23 +1,28 @@
-# Task 1 Report: Theme Scaffold
+# Task 1 Report: Block Low-Quality Source Domains
 
 **Status:** DONE
 
 **Commits:**
-- `0067d2a` — feat(theme): scaffold block theme with theme.json, templates, parts
+- `a3bc5fd` — feat: block low-quality source domains in worker collection
 
-**Files created (9):**
-- `theme/style.css` — Theme header (Observatory Index, v1.0.0)
-- `theme/theme.json` — Full FSE config: 8-color palette, 3 font families, fluid typography, duotone, element/block styles, custom template + 5 template parts
-- `theme/functions.php` — Namespaced PHP: editor style, block support, `ec-thin-rule` separator style, Google Fonts + theme CSS enqueue
-- `theme/screenshot.png` — 1×1 placeholder PNG
-- `theme/templates/index.html` — Default template with header, centered heading, post content, footer
-- `theme/parts/header.html` — Black header with site title + navigation
-- `theme/parts/footer.html` — Black footer with copyright
-- `theme/assets/theme.css` — CSS custom properties + thin rule class
-- `theme/assets/editor.css` — Editor body font styles
+**Files changed:**
+- `worker/src/index.js` — added `BLOCKED_DOMAINS` set, `filterBriefingSources()` function, and filter call in `processRun()`
 
-**Directories created:** `theme/assets/`, `theme/templates/`, `theme/parts/`, `theme/patterns/` (empty, for Task 3)
+**Implementation:**
+The filter runs between `collector.deepDive(topic)` and `synthesizer.synthesize(briefing)` in the `processRun` function. It removes sources whose URL's hostname matches a blocked domain (exact match or subdomain match via `endsWith`).
 
-**Concerns:** None. All files match the brief exactly.
+**Blocked domains:**
+- `wikipedia.org` (catches `en.wikipedia.org`, `de.wikipedia.org`, etc.)
+- `archive.org` (catches `web.archive.org`, etc.)
+- `britannica.com` (catches `www.britannica.com`, etc.)
 
-**Report file:** `C:\Dev\Open Code Esoteric Current\.superpowers\sdd\task-1-report.md`
+**Self-review findings:**
+- Null/undefined `briefing.sources`: handled by guard clause returning early
+- Empty sources array: no-op, filtered count is 0, no log emitted
+- Source with no `url` property: preserved (can't filter on missing data)
+- Invalid/malformed URL: try/catch around `new URL()`, preserved (fail-open)
+- Subdomain matching: `hostname.endsWith('.' + domain)` correctly catches subdomains like `en.wikipedia.org`
+- False positive prevention: `evilwikipedia.org` does not match `wikipedia.org` (no `endsWith('.wikipedia.org')` and not exact match)
+- Filtering mutates `briefing.sources` in place, which propagates correctly to both the WordPress submission payload and the callback findings
+
+**Concerns:** None.
