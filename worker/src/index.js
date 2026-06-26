@@ -13,6 +13,12 @@ const ESOTERIC_CATEGORIES = [
   'Rosicrucianism', 'Neoplatonism',
 ];
 
+const BLOCKED_DOMAINS = new Set([
+  'wikipedia.org',
+  'archive.org',
+  'britannica.com',
+]);
+
 async function main() {
   const config = loadConfig();
   const log = createLogger(config.logLevel);
@@ -62,6 +68,31 @@ async function main() {
   const collector = createCollectorAgent(deepseek);
   const synthesizer = createSynthesizerAgent(deepseek);
 
+  function filterBriefingSources(briefing, log) {
+    if (!briefing.sources || !Array.isArray(briefing.sources)) return;
+    const before = briefing.sources.length;
+    briefing.sources = briefing.sources.filter(src => {
+      if (!src.url) return true;
+      let hostname;
+      try {
+        hostname = new URL(src.url).hostname;
+      } catch {
+        return true;
+      }
+      const blocked = [...BLOCKED_DOMAINS].some(domain =>
+        hostname === domain || hostname.endsWith('.' + domain)
+      );
+      if (blocked) {
+        log.debug('source-blocked', { url: src.url, title: src.title, domain: hostname });
+      }
+      return !blocked;
+    });
+    const filtered = before - briefing.sources.length;
+    if (filtered > 0) {
+      log.info('sources-filtered', { before, after: briefing.sources.length, filtered });
+    }
+  }
+
   async function processRun(run) {
     const topic = run.topic;
     log.info('process-topic', { title: topic.title, runUuid: run.run_uuid });
@@ -74,7 +105,9 @@ async function main() {
       }
       return null;
     }
-    log.info('collect-complete', { title: topic.title, keyPoints: briefing.key_points?.length ?? 0 });
+    log.info('collect-complete', { title: topic.title, keyPoints: briefing.key_points?.length ?? 0, sourcesBeforeFilter: briefing.sources?.length ?? 0 });
+
+    filterBriefingSources(briefing, log);
 
     const article = await synthesizer.synthesize(briefing);
     if (!article) {
