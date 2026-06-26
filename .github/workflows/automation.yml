@@ -22,7 +22,10 @@ jobs:
           cache: 'npm'
           cache-dependency-path: ./worker/package-lock.json
       - run: npm ci --omit=dev
-      - run: npm start
+      - name: Test health endpoint
+        run: curl -sSf "${{ secrets.WORDPRESS_URL }}/wp-json/ec/v1/health" || echo "health check failed"
+      - name: Run worker
+        run: node src/index.js 2>&1
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           WORDPRESS_URL: ${{ secrets.WORDPRESS_URL }}
