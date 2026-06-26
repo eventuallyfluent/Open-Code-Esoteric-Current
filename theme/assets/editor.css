@@ -1,2 +1,5 @@
-body { font-family: Inter, sans-serif; line-height: 1.7; }
-h1, h2, h3, h4 { font-family: 'Playfair Display', serif; }
+body { font-family: Inter, sans-serif; line-height: 1.7; color: #2C2C2C; background: #F5F0E8; }
+h1, h2, h3, h4, h5, h6 { font-family: 'Playfair Display', serif; }
+a { color: #6B1D2F; }
+.wp-block { max-width: 720px; }
+.wp-block[data-align="wide"] { max-width: 1140px; }
