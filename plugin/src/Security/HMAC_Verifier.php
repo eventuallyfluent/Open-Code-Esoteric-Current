@@ -3,7 +3,7 @@ namespace EsotericCurrent\Core\Security;
 
 class HMAC_Verifier {
     public static function sign(array $data, string $secret): string {
-        $payload = wp_json_encode($data);
+        $payload = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         return hash_hmac('sha256', $payload, $secret);
     }
 
