@@ -11,13 +11,54 @@ add_action('after_setup_theme', function () {
         'name' => 'ec-thin-rule',
         'label' => __('Thin Rule', 'observatory-index'),
     ]);
+
+    register_block_style('core/separator', [
+        'name' => 'ec-dashed-rule',
+        'label' => __('Dashed Rule', 'observatory-index'),
+    ]);
 });
 
 add_action('wp_enqueue_scripts', function () {
-    wp_enqueue_style('observatory-index-google-fonts', 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@400;600;700&display=swap', [], null);
-    wp_enqueue_style('observatory-index-theme', get_template_directory_uri() . '/assets/theme.css', ['observatory-index-google-fonts'], wp_get_theme()->get('Version'));
+    wp_enqueue_style(
+        'observatory-index-google-fonts',
+        'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Mono:wght@400;500&display=swap',
+        [],
+        null
+    );
+    wp_enqueue_style(
+        'observatory-index-theme',
+        get_template_directory_uri() . '/assets/theme.css',
+        ['observatory-index-google-fonts'],
+        wp_get_theme()->get('Version')
+    );
 });
 
 add_action('init', function () {
-    require_once get_template_directory() . '/patterns/masthead.php';
+    $patterns_dir = get_template_directory() . '/patterns';
+    foreach (glob($patterns_dir . '/*.php') as $file) {
+        require_once $file;
+    }
+});
+
+add_action('after_switch_theme', function () {
+    $pages = [
+        'submissions' => 'Submit a Source',
+        'about'       => 'About',
+        'privacy'     => 'Privacy Policy',
+        'terms'       => 'Terms of Use',
+        'contact'     => 'Contact',
+        'subscribe'   => 'Subscribe',
+    ];
+    foreach ($pages as $slug => $title) {
+        $existing = get_page_by_path($slug);
+        if (!$existing) {
+            wp_insert_post([
+                'post_title'   => $title,
+                'post_name'    => $slug,
+                'post_content' => '',
+                'post_status'  => 'publish',
+                'post_type'    => 'page',
+            ]);
+        }
+    }
 });

@@ -15,7 +15,7 @@ class Article_Controller {
     }
 
     public static function check_auth(\WP_REST_Request $request): bool {
-        $secret = defined('EC_API_SECRET') ? EC_API_SECRET : '';
+        $secret = ec_get_api_secret();
         if (empty($secret)) {
             return false;
         }

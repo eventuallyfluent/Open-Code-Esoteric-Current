@@ -45,57 +45,75 @@ async function main() {
     log.info('phase-research-complete', { count: topics.length });
   }
 
-  let claimedTopics = [];
+  let claimedRuns = [];
   if (!config.dryRun && topics.length > 0) {
     const claimResult = await wp.claim(topics);
-    if (claimResult.claimed && claimResult.topic) {
-      claimedTopics = [claimResult.topic];
-      log.info('topics-claimed', { topic: claimResult.topic.title, runUuid: claimResult.run_uuid });
+    if (claimResult.claimed && claimResult.runs?.length > 0) {
+      claimedRuns = claimResult.runs;
+      log.info('topics-claimed', { count: claimedRuns.length });
+      claimedRuns.forEach(r => log.info('claimed-topic', { topic: r.topic.title, runUuid: r.run_uuid }));
     } else {
       log.info('no-topics-to-claim', { message: claimResult.message });
     }
   } else if (config.dryRun) {
-    claimedTopics = topics;
+    claimedRuns = topics.map(t => ({ topic: t, run_uuid: 'dry-run' }));
   }
 
   const collector = createCollectorAgent(deepseek);
   const synthesizer = createSynthesizerAgent(deepseek);
 
-  const articles = [];
-
-  for (const topic of claimedTopics) {
-    log.info('process-topic', { title: topic.title });
+  async function processRun(run) {
+    const topic = run.topic;
+    log.info('process-topic', { title: topic.title, runUuid: run.run_uuid });
 
     const briefing = await collector.deepDive(topic);
     if (!briefing) {
       log.warn('collect-failed', { title: topic.title });
-      continue;
+      if (!config.dryRun) {
+        await wp.sendCallback({ run_uuid: run.run_uuid, status: 'failed', error: { code: 'collect_failed', message: 'Agent could not compile briefing' } });
+      }
+      return null;
     }
     log.info('collect-complete', { title: topic.title, keyPoints: briefing.key_points?.length ?? 0 });
 
     const article = await synthesizer.synthesize(briefing);
     if (!article) {
       log.warn('synthesize-failed', { title: topic.title });
-      continue;
+      if (!config.dryRun) {
+        await wp.sendCallback({ run_uuid: run.run_uuid, status: 'failed', error: { code: 'synthesize_failed', message: 'Agent could not generate article' } });
+      }
+      return null;
     }
     log.info('synthesize-complete', { title: article.title, wordCount: article.content?.length ?? 0 });
 
-    articles.push({ ...article, _briefing: briefing });
-
     if (!config.dryRun) {
-      await wp.submitArticle({
+      const submitResult = await wp.submitArticle({
         title: article.title,
         content: article.content,
         excerpt: article.excerpt,
         tags: article.tags,
-        source_category: topic.category,
+        source_category: topic.category || topic.category_name,
         research_notes: JSON.stringify(briefing),
       });
-      log.info('article-submitted', { title: article.title });
+      log.info('article-submitted', { title: article.title, postId: submitResult.post_id });
+
+      await wp.sendCallback({
+        run_uuid: run.run_uuid,
+        status: 'completed',
+        findings: [
+          { title: article.title, content: article.content, excerpt: article.excerpt, tags: article.tags, post_id: submitResult.post_id, source: briefing.sources }
+        ],
+      });
+      log.info('run-completed', { runUuid: run.run_uuid });
     }
+
+    return { title: article.title, content: article.content, excerpt: article.excerpt, tags: article.tags, _briefing: briefing };
   }
 
-  log.info('worker-complete', { articlesProduced: articles.length });
+  const results = await Promise.all(claimedRuns.map(processRun));
+  const articles = results.filter(Boolean);
+
+  log.info('worker-complete', { topicsClaimed: claimedRuns.length, articlesProduced: articles.length });
 }
 
 main().catch(err => {

@@ -1,10 +1,12 @@
 <!-- wp:template-part {"slug":"header","tagName":"header"} /-->
-<!-- wp:group {"tagName":"main","layout":{"type":"constrained"},"style":{"spacing":{"padding":{"top":"3rem","bottom":"3rem"}}}} -->
-<main class="wp-block-group" style="padding-top:3rem;padding-bottom:3rem">
-    <!-- wp:heading {"level":1,"textAlign":"center"} -->
-    <h1 class="wp-block-heading has-text-align-center">The Esoteric Current</h1>
-    <!-- /wp:heading -->
-    <!-- wp:post-content /-->
+
+<!-- wp:group {"tagName":"main","layout":{"type":"default"},"className":"ec-container"} -->
+<main class="wp-block-group ec-container" style="padding-top:3rem;padding-bottom:3rem">
+  <!-- wp:heading {"level":1,"style":{"typography":{"fontWeight":"400"}}} -->
+  <h1 class="wp-block-heading" style="font-weight:400">The Esoteric Current</h1>
+  <!-- /wp:heading -->
+  <!-- wp:ec/editorial-feed {"count":24,"display":"grid","columns":3,"show_excerpt":true} /-->
 </main>
 <!-- /wp:group -->
+
 <!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->

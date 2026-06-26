@@ -20,6 +20,22 @@ class Migration {
         $this->create_run_log_table($wpdb);
     }
 
+    public function migrate_1_0_1(): void {
+        global $wpdb;
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        $this->create_sources_table($wpdb);
+        $this->create_source_items_table($wpdb);
+        $this->create_research_topics_table($wpdb);
+        $this->create_agent_runs_table($wpdb);
+        $this->create_findings_table($wpdb);
+        $this->create_resources_table($wpdb);
+        $this->create_issues_table($wpdb);
+        $this->create_submissions_table($wpdb);
+        $this->create_editorial_queue_table($wpdb);
+        $this->create_run_log_table($wpdb);
+    }
+
     private function create_sources_table($wpdb): void {
         $table = $wpdb->prefix . 'ec_sources';
         $sql = "CREATE TABLE {$table} (

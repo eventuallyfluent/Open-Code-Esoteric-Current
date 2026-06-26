@@ -23,6 +23,11 @@ class Callback_Controller {
         $signature = $request->get_header('X-EC-Signature');
         $timestamp = $request->get_header('X-EC-Timestamp');
         $nonce = $request->get_header('X-EC-Nonce');
+        $secret = ec_get_api_secret();
+
+        if (empty($secret) || empty($signature) || empty($timestamp) || empty($nonce)) {
+            return false;
+        }
 
         return HMAC_Verifier::verify_request(
             'POST', '/ec/v1/callback', $request->get_body(),
