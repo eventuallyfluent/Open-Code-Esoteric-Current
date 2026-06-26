@@ -1,6 +1,8 @@
 <?php
 namespace EsotericCurrent\Core;
 
+use EsotericCurrent\Core\Database\Schema;
+
 class Plugin {
     private static ?Plugin $instance = null;
     private bool $initialized = false;
@@ -17,9 +19,11 @@ class Plugin {
             return;
         }
         $this->initialized = true;
+        add_action('init', [Schema::class, 'migrate']);
     }
 
     public static function activate(): void {
+        Schema::migrate();
     }
 
     public static function deactivate(): void {
