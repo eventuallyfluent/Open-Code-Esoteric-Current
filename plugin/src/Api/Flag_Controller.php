@@ -29,7 +29,7 @@ class Flag_Controller {
             return new \WP_REST_Response(['error' => 'reason is required'], 400);
         }
 
-        $allowed_reasons = ['inaccurate', 'harmful', 'plagiarism', 'spam', 'other'];
+        $allowed_reasons = ['low-quality', 'wrong-category', 'broken-link', 'other'];
         if (!in_array($reason, $allowed_reasons, true)) {
             return new \WP_REST_Response(['error' => 'Invalid reason. Allowed: ' . implode(', ', $allowed_reasons)], 400);
         }
@@ -62,6 +62,6 @@ class Flag_Controller {
         return new \WP_REST_Response([
             'success' => true,
             'flag_id' => (int) $wpdb->insert_id,
-        ]);
+        ], 201);
     }
 }

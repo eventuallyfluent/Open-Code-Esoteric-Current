@@ -40,7 +40,7 @@ class Flag_Repository {
         $offset = !empty($args['offset']) ? (int)$args['offset'] : 0;
 
         $sql = $this->db->prepare(
-            "SELECT * FROM {$this->table} WHERE {$where} ORDER BY created_at DESC LIMIT %d OFFSET %d",
+            "SELECT * FROM {$this->table} WHERE {$where} ORDER BY reviewed ASC, created_at DESC LIMIT %d OFFSET %d",
             array_merge($params, [$limit, $offset])
         );
 

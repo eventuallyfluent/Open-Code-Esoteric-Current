@@ -54,7 +54,9 @@ class Flags_List_Table extends \WP_List_Table {
 
     protected function column_finding_title($item): string {
         $title = $this->get_finding_title((int)$item['finding_id']);
-        return esc_html($title ?: "(finding #{$item['finding_id']})");
+        $label = $title ?: "(finding #{$item['finding_id']})";
+        $url = site_url('/finding/' . (int)$item['finding_id'] . '/');
+        return '<a href="' . esc_url($url) . '" target="_blank">' . esc_html($label) . '</a>';
     }
 
     protected function column_reviewed($item): string {
@@ -165,6 +167,9 @@ class Flags_Page {
         ?>
         <div class="wrap">
             <h1>Flagged Findings</h1>
+            <?php if (!empty($_GET['ec_flag_msg'])): ?>
+                <div class="notice notice-success is-dismissible"><p><?php echo esc_html(rawurldecode($_GET['ec_flag_msg'])); ?></p></div>
+            <?php endif; ?>
             <form method="get">
                 <input type="hidden" name="page" value="ec-flags" />
                 <?php $table->search_box('Search', 'flag-search'); ?>
@@ -202,26 +207,30 @@ class Flags_Page {
             exit;
         }
 
-        // Bulk actions
-        if (isset($_POST['action']) && $_POST['action'] === 'dismiss' && !empty($_POST['flag_ids'])) {
-            if (!wp_verify_nonce($_POST['_wpnonce'] ?? '', 'ec_flag_bulk')) {
-                wp_die('Security check failed');
-            }
-            $ids = array_map('intval', $_POST['flag_ids']);
-            $repo->dismiss_multiple($ids);
-            wp_safe_redirect(admin_url('admin.php?page=ec-flags'));
-            exit;
+        // Bulk actions (top and bottom dropdown)
+        $bulk_action = $_POST['action'] ?? '';
+        if ($bulk_action === '-1' && !empty($_POST['action2']) && $_POST['action2'] !== '-1') {
+            $bulk_action = $_POST['action2'];
         }
 
-        if (isset($_POST['action']) && $_POST['action'] === 'delete' && !empty($_POST['flag_ids'])) {
+        if (in_array($bulk_action, ['dismiss', 'delete'], true) && !empty($_POST['flag_ids'])) {
             if (!wp_verify_nonce($_POST['_wpnonce'] ?? '', 'ec_flag_bulk')) {
                 wp_die('Security check failed');
             }
             $ids = array_map('intval', $_POST['flag_ids']);
-            foreach ($ids as $id) {
-                $repo->delete($id);
+            $count = count($ids);
+
+            if ($bulk_action === 'dismiss') {
+                $repo->dismiss_multiple($ids);
+                $msg = sprintf('%d flag(s) dismissed.', $count);
+            } else {
+                foreach ($ids as $id) {
+                    $repo->delete($id);
+                }
+                $msg = sprintf('%d flag(s) deleted.', $count);
             }
-            wp_safe_redirect(admin_url('admin.php?page=ec-flags'));
+
+            wp_safe_redirect(add_query_arg('ec_flag_msg', rawurlencode($msg), admin_url('admin.php?page=ec-flags')));
             exit;
         }
     }
