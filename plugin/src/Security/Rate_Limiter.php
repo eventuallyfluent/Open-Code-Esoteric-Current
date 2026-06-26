@@ -8,10 +8,15 @@ class Rate_Limiter {
 
         if (time() > $data['reset_at']) {
             $data = ['count' => 0, 'reset_at' => time() + $window_seconds];
-            update_option($option_key, $data);
         }
 
-        return $data['count'] < $max_attempts;
+        if ($data['count'] >= $max_attempts) {
+            return false;
+        }
+
+        $data['count']++;
+        update_option($option_key, $data);
+        return true;
     }
 
     public static function increment(string $key): int {
