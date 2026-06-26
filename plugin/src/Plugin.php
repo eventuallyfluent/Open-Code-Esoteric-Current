@@ -6,6 +6,7 @@ use EsotericCurrent\Core\Admin\Settings_Page;
 use EsotericCurrent\Core\Api\Callback_Controller;
 use EsotericCurrent\Core\Api\Claim_Controller;
 use EsotericCurrent\Core\Api\Health_Controller;
+use EsotericCurrent\Core\Blocks\Block_Registrar;
 use EsotericCurrent\Core\Database\Schema;
 
 class Plugin {
@@ -30,6 +31,7 @@ class Plugin {
         add_action('rest_api_init', [Callback_Controller::class, 'register']);
         add_action('admin_menu', [Admin_Menu::class, 'register']);
         add_action('admin_init', [Settings_Page::class, 'register_settings']);
+        add_action('init', [Block_Registrar::class, 'register_all']);
     }
 
     public static function activate(): void {
