@@ -56,7 +56,14 @@ class Editorial_Feed_Block {
             $params[] = sanitize_title($ec_resource_type);
         }
 
-        $blocked = ['wikipedia.org', 'archive.org', 'encyclopedia.com', 'britannica.com'];
+        $blocked = [
+            'wikipedia.org', 'archive.org', 'encyclopedia.com', 'britannica.com',
+            'amazon.com', 'ebay.com', 'etsy.com', 'goodreads.com',
+            'jstor.org', 'academia.edu', 'researchgate.net',
+            'coursera.org', 'udemy.com', 'edx.org',
+            'oup.com', 'cambridge.org', 'springer.com',
+            'youtube.com', 'instagram.com', 'facebook.com', 'twitter.com', 'reddit.com',
+        ];
         foreach ($blocked as $b) {
             $where .= ' AND COALESCE(f.source_url, f.url) NOT LIKE %s';
             $params[] = '%' . $wpdb->esc_like($b);

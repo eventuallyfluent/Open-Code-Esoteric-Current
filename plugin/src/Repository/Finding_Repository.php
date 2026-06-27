@@ -19,7 +19,14 @@ class Finding_Repository {
         return $row ?: null;
     }
 
-    private const BLOCKED_DOMAINS = ['wikipedia.org', 'archive.org', 'encyclopedia.com', 'britannica.com'];
+    private const BLOCKED_DOMAINS = [
+        'wikipedia.org', 'archive.org', 'encyclopedia.com', 'britannica.com',
+        'amazon.com', 'ebay.com', 'etsy.com', 'goodreads.com',
+        'jstor.org', 'academia.edu', 'researchgate.net',
+        'coursera.org', 'udemy.com', 'edx.org',
+        'oup.com', 'cambridge.org', 'springer.com',
+        'youtube.com', 'instagram.com', 'facebook.com', 'twitter.com', 'reddit.com',
+    ];
 
     public function get_all(array $args = []): array {
         $where = '1=1';
