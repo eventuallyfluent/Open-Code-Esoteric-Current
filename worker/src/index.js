@@ -11,6 +11,7 @@ const CATEGORIES = [
   'Chaos Magic', 'Shamanism', 'Astrology',
 ];
 
+const MIN_SCORE = 4;
 const MAX_SITES = 3;
 const MAX_PAGES_PER_SITE = 3;
 const MAX_FINDINGS = 8;
@@ -41,7 +42,7 @@ Return JSON array: [{ url, name, why_interesting }]. Max 5 results.` },
     }
     const score = scoreLink(page.url, page.text);
     log.info('site-checked', { url: page.url, score, textLen: page.text.length, category });
-    if (score >= 3) {
+    if (score >= MIN_SCORE) {
       verified.push({ url: page.url, name: c.name || '', text: page.text, score, why: c.why_interesting || '' });
     }
     if (verified.length >= MAX_SITES) break;

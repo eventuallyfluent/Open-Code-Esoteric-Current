@@ -25,19 +25,36 @@ function extractText(html) {
   return text;
 }
 
+const BLOCKED_DOMAINS = [
+  'amazon.com', 'ebay.com', 'etsy.com',
+  'wikipedia.org', 'britannica.com', 'encyclopedia.com',
+  'coursera.org', 'udemy.com', 'edx.org',
+  'jstor.org', 'academia.edu', 'researchgate.net',
+  'oup.com', 'cambridge.org', 'springer.com', 'tandfonline.com',
+  'sagepub.com', 'wiley.com', 'elsevier.com', 'sciencedirect.com',
+  'degruyter.com', 'brill.com', 'mit.edu', 'harvard.edu',
+  'stanford.edu', 'ox.ac.uk', 'cam.ac.uk',
+  'wikipedia.org', 'britannica.com',
+  'goodreads.com', 'amazon.com',
+  'youtube.com', 'vimeo.com',
+  'instagram.com', 'facebook.com', 'twitter.com', 'x.com',
+  'reddit.com', 'quora.com', 'medium.com',
+  'archive.org', 'scribd.com', 'issuu.com',
+];
+
 export function scoreLink(url, text) {
-  let score = 5;
+  let score = 4;
   const u = url.toLowerCase();
   const t = text.toLowerCase();
-  if (/amazon\.com|ebay\.com|etsy\.com/.test(u)) score -= 3;
-  if (/wikipedia\.org|britannica\.com|encyclopedia\.com/.test(u)) score -= 5;
-  if (/coursera\.org|udemy\.com|edx\.org/.test(u)) score -= 3;
-  if (/jstor\.org|academia\.edu|researchgate\.net/.test(u)) score -= 2;
-  if (/\.gov|\.mil|\.edu\//.test(u)) score -= 1;
-  if (t.length < 200) score -= 2;
-  if (/esoteric|occult|hermetic|magic|alchemy|gnostic|kabbalah|tantra|sufi|mystic|shaman/i.test(t)) score += 3;
-  if (/practitioner|ritual|initiation|tradition|teachings|wisdom|ancient|secret|sacred/i.test(t)) score += 2;
+  for (const domain of BLOCKED_DOMAINS) {
+    if (u.includes(domain)) score -= 4;
+  }
+  if (/\.gov|\.mil/.test(u)) score -= 3;
+  if (/\.edu\//.test(u)) score -= 2;
+  if (t.length < 300) score -= 2;
+  if (/esoteric|occult|hermetic|magic|alchemy|gnostic|kabbalah|tantra|sufi|mystic|shaman|wicca|pagan|ceremonial/i.test(t)) score += 3;
+  if (/practitioner|ritual|initiation|tradition|teachings|wisdom|ancient|secret|sacred|grimoire|initiate|adept/i.test(t)) score += 2;
+  if (/blog|podcast|zine|newsletter|forum|community|personal/i.test(u)) score += 3;
   if (/course|workshop|seminar|retreat|conference|festival/i.test(t)) score += 1;
-  if (/blog|podcast|zine|newsletter|forum|community/i.test(u)) score += 2;
   return Math.max(0, Math.min(10, score));
 }

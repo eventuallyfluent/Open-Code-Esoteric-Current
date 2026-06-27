@@ -115,14 +115,17 @@ class Finding_Repository {
     }
 
     public function create_from_agent(array $finding, int $run_id, ?int $topic_id): ?int {
-        $finding_id = $this->create([
+        $content_hash = $finding['content_hash'] ?? hash('sha256', $finding['url'] ?? '');
+        $existing = $this->get_by_hash($content_hash);
+
+        $data = [
             'run_id' => $run_id,
             'topic_id' => $topic_id,
             'finding_type' => $finding['finding_type'] ?? 'article',
             'title' => $finding['title'] ?? '',
             'url' => $finding['url'] ?? '',
             'source_url' => $finding['source_url'] ?? null,
-            'content_hash' => $finding['content_hash'] ?? hash('sha256', $finding['url'] ?? ''),
+            'content_hash' => $content_hash,
             'content' => $finding['content'] ?? null,
             'excerpt' => $finding['excerpt'] ?? null,
             'evidence' => $finding['evidence'] ?? null,
@@ -130,7 +133,15 @@ class Finding_Repository {
             'confidence_score' => $finding['confidence_score'] ?? null,
             'classification' => $finding['classification'] ?? null,
             'status' => 'awaiting_review',
-        ]);
+        ];
+
+        if ($existing) {
+            $data['status'] = $existing['status'];
+            $this->update((int)$existing['id'], $data);
+            $finding_id = (int)$existing['id'];
+        } else {
+            $finding_id = $this->create($data);
+        }
 
         if ($finding_id && !empty($finding['classification'])) {
             $term_repo = new \EsotericCurrent\Core\Repository\Term_Repository();
