@@ -86,7 +86,7 @@ class Finding_Repository {
         $join_sql = !empty($joins) ? ' ' . implode(' ', $joins) : '';
 
         $sql = $this->db->prepare(
-            "SELECT f.* FROM {$from}{$join_sql} WHERE {$where} ORDER BY f.created_at DESC LIMIT %d OFFSET %d",
+            "SELECT DISTINCT f.* FROM {$from}{$join_sql} WHERE {$where} ORDER BY f.created_at DESC LIMIT %d OFFSET %d",
             array_merge($params, [$limit, $offset])
         );
 

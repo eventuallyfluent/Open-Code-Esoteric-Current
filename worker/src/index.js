@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { loadConfig } from './config.js';
 import { createLogger } from './utils/logger.js';
 import { createDeepSeekClient } from './deepseek.js';
@@ -118,7 +119,6 @@ Return JSON array of objects:
 - url: string (the specific page URL)
 - resource_type: string (MUST be one of: article|book|interview|research-paper|event|podcast|course|organization|teacher)
 - classification: string (comma-separated topic keywords e.g. "hermeticism,alchemy,text")
-- content_hash: string (sha256 of the URL)
 - reason_interesting: string
 
 Max 3 findings. IMPORTANT: skip anything that looks like a product catalogue, shopping page, or commercial listing.` },
@@ -163,14 +163,15 @@ async function main() {
     for (const site of sites) {
       const findings = await diveSite(deepseek, site, log);
       for (const f of findings) {
+        const rawUrl = f.url || site.url;
         allFindings.push({
           title: f.title || site.name,
           excerpt: f.excerpt || f.reason_interesting || '',
-          url: f.url || site.url,
-          source_url: f.url || site.url,
+          url: rawUrl,
+          source_url: rawUrl,
           finding_type: (f.resource_type || 'article').toLowerCase(),
           classification: f.classification || '',
-          content_hash: f.content_hash || '',
+          content_hash: crypto.createHash('sha256').update(rawUrl).digest('hex'),
           source_domain: (() => { try { return new URL(f.url || site.url).hostname; } catch { return 'unknown'; } })(),
         });
       }
