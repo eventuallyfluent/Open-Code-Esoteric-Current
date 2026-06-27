@@ -155,9 +155,29 @@ class Editorial_Feed_Block {
     }
 
     private static function render_grid(array $items, bool $show_excerpt, int $columns): void {
+        global $wpdb;
         ?>
         <div class="ec-feed-grid">
-            <?php foreach ($items as $item): ?>
+            <?php foreach ($items as $i => $item):
+                $is_featured = $i === 0;
+                $topics = [];
+                if ($is_featured && !empty($item->source_id)) {
+                    $rel_table = $wpdb->prefix . 'ec_term_relationships';
+                    $tax_table = $wpdb->prefix . 'ec_term_taxonomy';
+                    $terms_table = $wpdb->prefix . 'ec_terms';
+                    $topics = $wpdb->get_results(
+                        $wpdb->prepare(
+                            "SELECT t.name, t.slug FROM {$rel_table} r
+                             INNER JOIN {$tax_table} tt ON r.term_taxonomy_id = tt.id AND tt.taxonomy = 'ec_topic'
+                             INNER JOIN {$terms_table} t ON tt.term_id = t.id
+                             WHERE r.object_id = %d
+                             ORDER BY t.name ASC
+                             LIMIT 5",
+                            $item->source_id
+                        )
+                    );
+                }
+            ?>
                 <article class="ec-feed-card">
                     <div class="ec-feed-card-top">
                         <span class="ec-feed-type ec-feed-type--<?php echo esc_attr($item->finding_type ?: 'default'); ?>">
@@ -170,8 +190,15 @@ class Editorial_Feed_Block {
                             <?php echo esc_html($item->title); ?>
                         </a>
                     </h3>
-                    <?php if ($show_excerpt && !empty($item->excerpt)): ?>
+                    <?php if ($is_featured && !empty($item->excerpt)): ?>
                         <p class="ec-feed-card-excerpt"><?php echo esc_html($item->excerpt); ?></p>
+                    <?php endif; ?>
+                    <?php if ($is_featured && $topics): ?>
+                        <div class="ec-card-topics">
+                            <?php foreach ($topics as $t): ?>
+                                <a href="<?php echo esc_url(home_url('/topic/' . $t->slug . '/')); ?>" class="ec-card-topic"><?php echo esc_html($t->name); ?></a>
+                            <?php endforeach; ?>
+                        </div>
                     <?php endif; ?>
                     <div class="ec-feed-card-footer">
                         <span class="ec-feed-card-source">

@@ -3,9 +3,9 @@ import { loadConfig } from './config.js';
 import { createLogger } from './utils/logger.js';
 import { createDeepSeekClient } from './deepseek.js';
 import { createWordPressClient } from './wordpress.js';
-import { fetchPage, scoreLink } from './utils/fetcher.js';
+import { fetchPage, scoreLink, discoverSitemapUrls } from './utils/fetcher.js';
 
-const CATEGORIES = [
+const FALLBACK_CATEGORIES = [
   'Hermeticism', 'Alchemy', 'Ceremonial Magic', 'Kabbalah',
   'Gnosticism', 'Dzogchen', 'Tantra', 'Sufism', 'Mysticism',
   'Esoteric Christianity', 'Theosophy', 'Occultism',
@@ -100,6 +100,22 @@ Return JSON array: [{ path: string, reason: string }]. Paths should be relative 
     } catch {}
   }
 
+  if (pages.length < 2) {
+    const sitemapUrls = await discoverSitemapUrls(site.url, log);
+    const contentPattern = /\/blog\/|\/articles\/|\/interview\/|\/review\/|\/post\/|\/podcast\/|\/event\/|\/course\/|\/research\/|\/essays\/|\/writings\/|\/library\//i;
+    const candidates = sitemapUrls
+      .filter(u => contentPattern.test(u) && !pages.some(p => p.url === u))
+      .slice(0, MAX_PAGES_PER_SITE - pages.length);
+    for (const u of candidates) {
+      const page = await fetchPage(u, log);
+      if (page && page.text.length > 200) {
+        pages.push({ url: page.url, text: page.text });
+        log.info('sitemap-page-fetched', { url: page.url, len: page.text.length });
+      }
+      if (pages.length >= MAX_PAGES_PER_SITE) break;
+    }
+  }
+
   const evalRes = await deepseek.chat([
     { role: 'system', content: `You are a curator of esoteric content. Below is real content from ${site.name || 'a website'} about esoteric topics.
 
@@ -113,12 +129,14 @@ EXCLUDE completely:
 
 Only include resources you can confirm exist from the actual page content provided.
 
+CRITICAL: Each finding MUST have a classification field that lists at most 3 topic keywords (comma-separated), e.g. "hermeticism,alchemy,text". Prefer the most specific and relevant topics. Never use more than 3.
+
 Return JSON array of objects:
 - title: string (descriptive title of the specific resource)
 - excerpt: string (1-2 sentences explaining what it is and why it's noteworthy)
 - url: string (the specific page URL)
 - resource_type: string (MUST be one of: article|book|interview|research-paper|event|podcast|course|organization|teacher)
-- classification: string (comma-separated topic keywords e.g. "hermeticism,alchemy,text")
+- classification: string (at most 3 comma-separated topic keywords)
 - reason_interesting: string
 
 Max 3 findings. IMPORTANT: skip anything that looks like a product catalogue, shopping page, or commercial listing.` },
@@ -133,6 +151,16 @@ Max 3 findings. IMPORTANT: skip anything that looks like a product catalogue, sh
   const filtered = (raw || []).filter(isQualityFinding);
   if (filtered.length < raw.length) {
     log.info('findings-filtered', { url: site.url, before: raw.length, after: filtered.length });
+  }
+
+  for (const f of filtered) {
+    if (f.classification) {
+      const parts = f.classification.split(',').map(s => s.trim()).filter(Boolean);
+      if (parts.length > 3) {
+        f.classification = parts.slice(0, 3).join(',');
+        log.debug('classification-capped', { url: f.url, before: parts.length, after: 3 });
+      }
+    }
   }
   return filtered;
 }
@@ -151,7 +179,21 @@ async function main() {
     log.info('wp-health-ok', { version: health.version });
   }
 
-  for (const category of CATEGORIES) {
+  let categories;
+  try {
+    categories = await wp.getTopics();
+    log.info('topics-fetched', { count: categories.length, topics: categories });
+  } catch (err) {
+    log.warn('topics-fetch-failed', { error: err.message, fallback: true });
+    categories = FALLBACK_CATEGORIES;
+  }
+
+  if (!Array.isArray(categories) || categories.length === 0) {
+    log.warn('no-topics-available', { fallback: true });
+    categories = FALLBACK_CATEGORIES;
+  }
+
+  for (const category of categories) {
     log.info('phase-discover', { category });
     const sites = await findRelevantSites(deepseek, category, log);
     if (sites.length === 0) {

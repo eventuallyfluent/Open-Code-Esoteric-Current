@@ -34,6 +34,7 @@ class Plugin {
         add_action('rest_api_init', [Flag_Controller::class, 'register']);
         add_action('rest_api_init', [Article_Controller::class, 'register']);
         add_action('rest_api_init', [Callback_Controller::class, 'register']);
+        add_action('rest_api_init', [Api\Topics_Controller::class, 'register']);
         add_action('admin_menu', [Admin_Menu::class, 'register']);
         add_action('admin_init', [Settings_Page::class, 'register_settings']);
         add_action('init', [Finding_Router::class, 'init']);
@@ -116,12 +117,12 @@ class Plugin {
 
     public static function dynamic_type_css(): void {
         $types = [
-            'news-article' => '#8b5cf6', 'book' => '#22d3ee', 'event' => '#3b82f6',
-            'interview' => '#22d3ee', 'research-paper' => '#a78bfa', 'podcast' => '#8b5cf6',
-            'video' => '#22d3ee', 'organization' => '#3b82f6', 'person' => '#a78bfa',
-            'resource' => '#8b5cf6', 'development' => '#22d3ee',
+            'news-article' => '#c9a84c', 'book' => '#c9a84c', 'event' => '#c9a84c',
+            'interview' => '#c9a84c', 'research-paper' => '#c9a84c', 'podcast' => '#c9a84c',
+            'video' => '#c9a84c', 'organization' => '#c9a84c', 'person' => '#c9a84c',
+            'resource' => '#c9a84c', 'development' => '#c9a84c',
         ];
-        $colors = ['#8b5cf6', '#22d3ee', '#3b82f6', '#a78bfa', '#f59e0b', '#22d3ee', '#3b82f6', '#8b5cf6'];
+        $colors = ['#c9a84c', '#c9a84c', '#c9a84c', '#c9a84c'];
         $i = 0;
         echo '<style id="ec-type-colors">';
         foreach ($types as $slug => $color) {

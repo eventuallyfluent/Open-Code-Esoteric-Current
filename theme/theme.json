@@ -5,15 +5,13 @@
     "appearanceTools": true,
     "color": {
       "palette": [
-        { "slug": "bg", "color": "#0a0a12", "name": "Background" },
-        { "slug": "panel", "color": "#12121e", "name": "Panel" },
-        { "slug": "border", "color": "#1e1e30", "name": "Border" },
-        { "slug": "text", "color": "#f0eef5", "name": "Text" },
-        { "slug": "muted", "color": "#1e1e2e", "name": "Muted" },
-        { "slug": "gold", "color": "#8b5cf6", "name": "Purple" },
-        { "slug": "burgundy", "color": "#22d3ee", "name": "Cyan" },
-        { "slug": "navy", "color": "#3b82f6", "name": "Blue" },
-        { "slug": "archival", "color": "#a8a3b8", "name": "Muted Text" }
+        { "slug": "bg", "color": "#181817", "name": "Background" },
+        { "slug": "panel", "color": "#1e1e1b", "name": "Panel" },
+        { "slug": "border", "color": "#2a2824", "name": "Border" },
+        { "slug": "text", "color": "#ece8e0", "name": "Text" },
+        { "slug": "muted", "color": "#1e1e1b", "name": "Muted" },
+        { "slug": "gold", "color": "#c9a84c", "name": "Gold" },
+        { "slug": "muted-text", "color": "#8a8678", "name": "Muted Text" }
       ]
     },
     "typography": {
@@ -27,6 +25,11 @@
           "slug": "sans",
           "name": "Sans-Serif",
           "fontFamily": "'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif"
+        },
+        {
+          "slug": "serif",
+          "name": "Serif",
+          "fontFamily": "Lora, Georgia, serif"
         },
         {
           "slug": "mono",
@@ -62,7 +65,7 @@
       "text": "var(--wp--preset--color--text)"
     },
     "typography": {
-      "fontFamily": "var(--wp--preset--font-family--sans)",
+      "fontFamily": "var(--wp--preset--font-family--serif)",
       "lineHeight": 1.7
     },
     "elements": {
@@ -117,7 +120,7 @@
       },
       "link": {
         "color": { "text": "var(--wp--preset--color--gold)" },
-        ":hover": { "color": { "text": "var(--wp--preset--color--burgundy)" } }
+        ":hover": { "color": { "text": "#d4b96a" } }
       },
       "button": {
         "color": { "background": "var(--wp--preset--color--gold)", "text": "#ffffff" },

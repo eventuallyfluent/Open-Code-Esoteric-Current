@@ -1,3 +1,5 @@
+import * as cheerio from 'cheerio';
+
 export async function fetchPage(url, log) {
   try {
     const res = await fetch(url, {
@@ -6,7 +8,7 @@ export async function fetchPage(url, log) {
     });
     if (!res.ok) return null;
     const html = await res.text();
-    const text = extractText(html).slice(0, 4000);
+    const text = cheerioExtractText(html).slice(0, 4000);
     if (text.length < 100) return null;
     return { url: res.url, text };
   } catch {
@@ -14,14 +16,60 @@ export async function fetchPage(url, log) {
   }
 }
 
-function extractText(html) {
-  let text = html
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&[^;]+;/g, ' ')
+export async function discoverSitemapUrls(baseUrl, log) {
+  const origin = (() => { try { return new URL(baseUrl).origin; } catch { return null; } })();
+  if (!origin) return [];
+
+  const sitemapUrls = [
+    `${origin}/sitemap.xml`,
+    `${origin}/sitemap_index.xml`,
+    `${origin}/sitemap/`,
+  ];
+
+  const seen = new Set();
+  const links = [];
+
+  for (const smUrl of sitemapUrls) {
+    try {
+      const res = await fetch(smUrl, {
+        signal: AbortSignal.timeout(8000),
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; EsotericCurrentBot/1.0)' },
+      });
+      if (!res.ok) continue;
+      const xml = await res.text();
+
+      const locs = xml.match(/<loc>([^<]+)<\/loc>/g);
+      if (!locs || locs.length === 0) continue;
+
+      for (const loc of locs) {
+        const url = loc.replace(/<\/?loc>/g, '').trim();
+        if (!seen.has(url)) {
+          seen.add(url);
+          links.push(url);
+        }
+      }
+      log.info('sitemap-found', { url: smUrl, count: links.length });
+    } catch {
+      continue;
+    }
+    if (links.length > 0) break;
+  }
+
+  return links;
+}
+
+function cheerioExtractText(html) {
+  const $ = cheerio.load(html);
+
+  $('script, style, nav, header, footer, aside, .sidebar, .menu, .nav, .footer, .header, .comments, .comment, #comments, .advertisement, .ad, ins, iframe, noscript, svg, form, button, input, select, textarea').remove();
+
+  let text = $('article')?.text() || $('main')?.text() || $('.content')?.text() || $('.post')?.text() || $('.entry')?.text() || $('body')?.text() || '';
+
+  text = text
     .replace(/\s+/g, ' ')
+    .replace(/&[^;]+;/g, ' ')
     .trim();
+
   return text;
 }
 

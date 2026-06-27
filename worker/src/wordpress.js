@@ -51,11 +51,18 @@ export function createWordPressClient(config, log) {
     }, { maxRetries: config.maxRetries, log });
   }
 
+  async function getTopics() {
+    const topics = await apiGet('topics');
+    if (!Array.isArray(topics)) return [];
+    return topics.filter(t => t.title).map(t => t.title);
+  }
+
   return {
     health:        ()        => apiGet('health'),
     claim:         (topics)  => apiPost('claim', { topics }),
     submitArticle: (article) => apiPost('article', article),
     submitNote:    (content) => apiPost('note', content),
     sendCallback:  (data)    => apiPost('callback', data),
+    getTopics,
   };
 }
