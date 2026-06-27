@@ -15,7 +15,7 @@ class Callback_Controller {
     }
 
     public static function check_auth(\WP_REST_Request $request): bool {
-        $secret = defined('EC_API_SECRET') ? EC_API_SECRET : '';
+        $secret = ec_get_api_secret();
         if (empty($secret)) {
             return false;
         }
@@ -23,9 +23,8 @@ class Callback_Controller {
         $signature = $request->get_header('X-EC-Signature');
         $timestamp = $request->get_header('X-EC-Timestamp');
         $nonce = $request->get_header('X-EC-Nonce');
-        $secret = ec_get_api_secret();
 
-        if (empty($secret) || empty($signature) || empty($timestamp) || empty($nonce)) {
+        if (empty($signature) || empty($timestamp) || empty($nonce)) {
             return false;
         }
 
