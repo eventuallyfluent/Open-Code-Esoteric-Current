@@ -62,18 +62,29 @@ class Callback_Controller {
         if ($status === 'completed') {
             $agent_run_repo->complete_run($run_uuid, $findings, $cost);
 
+            global $wpdb;
+            $eq_table = $wpdb->prefix . 'ec_editorial_queue';
             $finding_repo = new \EsotericCurrent\Core\Repository\Finding_Repository();
             $created = 0;
             $errors = [];
             foreach ($findings as $i => $finding) {
                 try {
                     $id = $finding_repo->create_from_agent($finding, $run['id'], $run['topic_id']);
-                    if ($id) { $created++; }
+                    if ($id) {
+                        $wpdb->replace($eq_table, [
+                            'source_type' => 'finding',
+                            'source_id' => $id,
+                            'workflow_state' => 'published',
+                            'topic_id' => $run['topic_id'] ?? 0,
+                            'transitioned_at' => current_time('mysql'),
+                        ]);
+                        $created++;
+                    }
                 } catch (\Exception $e) {
                     $errors[] = "Finding $i: " . $e->getMessage();
                 }
             }
-            error_log("EC callback: $created findings created from run $run_uuid (" . count($findings) . " received)" . ($errors ? ' Errors: ' . implode('; ', $errors) : ''));
+            error_log("EC callback: $created findings auto-published from run $run_uuid (" . count($findings) . " received)" . ($errors ? ' Errors: ' . implode('; ', $errors) : ''));
 
             if (!empty($run['topic_id'])) {
                 $topic_repo = new \EsotericCurrent\Core\Repository\Research_Topic_Repository();
