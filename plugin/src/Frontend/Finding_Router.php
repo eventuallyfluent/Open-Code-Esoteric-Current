@@ -10,11 +10,58 @@ class Finding_Router {
         add_filter('query_vars', [self::class, 'add_query_var']);
         add_shortcode('ec_finding_detail', [self::class, 'render_shortcode']);
         add_shortcode('ec_catalogue_page', [self::class, 'render_catalogue']);
+        add_filter('the_title', [self::class, 'override_page_title'], 10, 2);
+        add_filter('the_content', [self::class, 'override_page_content'], 5);
     }
 
     public static function add_query_var(array $vars): array {
         $vars[] = 'ec_finding_id';
         return $vars;
+    }
+
+    public static function get_context(): array {
+        $finding_id = (int)get_query_var('ec_finding_id');
+        $topic_slug = get_query_var('ec_topic');
+        $type_slug = get_query_var('ec_resource_type');
+        $context = ['type' => 'catalogue', 'title' => 'Catalogue'];
+        if ($finding_id > 0) {
+            $repo = new Finding_Repository();
+            $finding = $repo->get_by_id($finding_id);
+            if ($finding) {
+                $context['type'] = 'finding';
+                $context['title'] = $finding['title'];
+                $context['id'] = $finding_id;
+            }
+        } elseif (!empty($topic_slug)) {
+            $t_repo = new Term_Repository();
+            $term = $t_repo->get_term_by_slug(sanitize_title($topic_slug), 'ec_topic');
+            $context['type'] = 'topic';
+            $context['title'] = $term ? $term['name'] : ucfirst(str_replace('-', ' ', $topic_slug));
+        } elseif (!empty($type_slug)) {
+            $t_repo = new Term_Repository();
+            $term = $t_repo->get_term_by_slug(sanitize_title($type_slug), 'ec_resource_type');
+            $context['type'] = 'type';
+            $context['title'] = $term ? $term['name'] : ucfirst(str_replace('-', ' ', $type_slug));
+        }
+        return $context;
+    }
+
+    public static function override_page_title(string $title, int $post_id = 0): string {
+        if (!in_the_loop() || !is_main_query()) return $title;
+        $context = self::get_context();
+        if ($context['type'] !== 'catalogue') return $context['title'];
+        return $title;
+    }
+
+    public static function override_page_content(string $content): string {
+        if (!is_main_query() || !in_the_loop()) return $content;
+        $finding_id = (int)get_query_var('ec_finding_id');
+        $topic_slug = get_query_var('ec_topic');
+        $type_slug = get_query_var('ec_resource_type');
+        if ($finding_id > 0 || !empty($topic_slug) || !empty($type_slug)) {
+            return do_shortcode('[ec_finding_detail]');
+        }
+        return $content;
     }
 
     public static function render_shortcode(): string {
@@ -23,7 +70,7 @@ class Finding_Router {
         $type_slug = get_query_var('ec_resource_type');
 
         if ($finding_id < 1 && empty($topic_slug) && empty($type_slug)) {
-            return '<p>No item specified.</p>';
+            return self::render_catalogue();
         }
 
         if ($finding_id < 1) {

@@ -19,12 +19,14 @@ const MAX_FINDINGS = 8;
 async function findRelevantSites(deepseek, category, log) {
   log.info('searching-sites', { category });
   const res = await deepseek.chat([
-    { role: 'system', content: `Search the web for real, currently active websites with genuinely interesting content about ${category} in esoteric/occult studies. 
+    { role: 'system', content: `Search the web for real, currently active websites with genuinely interesting content about ${category} in esoteric/occult studies.
 
-For each website, I will actually visit it to verify it exists. Only suggest websites you believe are real.
+I will visit each site to verify it exists. Only suggest websites you believe are real.
+
+CRITICAL: Skip any site that primarily sells products (incense, candles, oils, statues, supplies). Only suggest sites with substantial CONTENT: articles, book reviews, interviews, research, courses, events, podcasts.
 
 Return JSON array: [{ url, name, why_interesting }]. Max 5 results.` },
-    { role: 'user', content: `Search the web for the most interesting, active websites with real content about ${category}. Focus on practitioner sites, specialist publishers, niche blogs, and actual organizations — NOT mainstream academic publishers.` },
+    { role: 'user', content: `Find the most interesting, content-rich websites about ${category}. Prioritize: specialist publishers, practitioner blogs with real substance, interview series, research archives, course providers, and event organizers. Exclude shops and product sellers.` },
   ], { temperature: 0.5, maxTokens: 4096 });
 
   const text = res.choices?.[0]?.message?.content || '[]';
@@ -50,6 +52,20 @@ Return JSON array: [{ url, name, why_interesting }]. Max 5 results.` },
   return verified;
 }
 
+const ALLOWED_RESOURCE_TYPES = new Set([
+  'article', 'book', 'interview', 'research-paper', 'event', 'podcast', 'course', 'organization', 'teacher',
+]);
+
+const COMMERCIAL_PATTERNS = /\b(shop|store|buy|price|basket|cart|checkout|order|incense|candle|oil|product|merchandise|wholesale|retail)\b/i;
+
+function isQualityFinding(f) {
+  if (!f.title || !f.url) return false;
+  if (!ALLOWED_RESOURCE_TYPES.has((f.resource_type || 'article').toLowerCase())) return false;
+  if (COMMERCIAL_PATTERNS.test(f.title) || COMMERCIAL_PATTERNS.test(f.excerpt || '')) return false;
+  if ((f.excerpt || '').length < 20) return false;
+  return true;
+}
+
 async function diveSite(deepseek, site, log) {
   log.info('diving-site', { url: site.url });
 
@@ -68,7 +84,8 @@ Return JSON array: [{ path: string, reason: string }]. Paths should be relative 
   catch { suggestions = []; }
 
   const pages = [{ url: site.url, text: site.text }];
-  const base = new URL(site.url);
+  let base;
+  try { base = new URL(site.url); } catch { return []; }
   for (const s of (suggestions || [])) {
     if (pages.length >= MAX_PAGES_PER_SITE) break;
     try {
@@ -85,22 +102,39 @@ Return JSON array: [{ path: string, reason: string }]. Paths should be relative 
   const evalRes = await deepseek.chat([
     { role: 'system', content: `You are a curator of esoteric content. Below is real content from ${site.name || 'a website'} about esoteric topics.
 
-Pick the most genuinely interesting FINDINGS from this content — specific articles, pages, courses, or resources that are noteworthy. Exclude generic/low-effort content.
+Pick the most genuinely interesting and substantial FINDINGS — specific articles, book reviews, interviews with known authors/practitioners, research papers, events, or courses. 
+
+EXCLUDE completely:
+- Product listings, shops, stores, incense, candles, oils, merchandise, or anything for sale
+- Generic/low-effort blog posts, thin content, placeholder pages
+- Wikipedia-style encyclopedia entries
+- Social media profiles or forum threads
+
+Only include resources you can confirm exist from the actual page content provided.
 
 Return JSON array of objects:
-- title: string (descriptive title)
-- excerpt: string (1-2 sentences, why it's interesting)
+- title: string (descriptive title of the specific resource)
+- excerpt: string (1-2 sentences explaining what it is and why it's noteworthy)
 - url: string (the specific page URL)
-- resource_type: string (article|book|course|paper|event|teacher|organization|podcast)
+- resource_type: string (MUST be one of: article|book|interview|research-paper|event|podcast|course|organization|teacher)
+- classification: string (comma-separated topic keywords e.g. "hermeticism,alchemy,text")
+- content_hash: string (sha256 of the URL)
 - reason_interesting: string
 
-Max 3 findings. Only include things you can see evidence of in the actual content provided.` },
+Max 3 findings. IMPORTANT: skip anything that looks like a product catalogue, shopping page, or commercial listing.` },
     { role: 'user', content: pages.map((p, i) => `--- Page ${i + 1}: ${p.url} ---\n${p.text.slice(0, 2500)}`).join('\n\n') },
   ], { temperature: 0.3, maxTokens: 4096 });
 
   const evalText = evalRes.choices?.[0]?.message?.content || '[]';
-  try { return JSON.parse(evalText.replace(/```(?:json)?\n?/g, '').trim()); }
+  let raw;
+  try { raw = JSON.parse(evalText.replace(/```(?:json)?\n?/g, '').trim()); }
   catch { return []; }
+
+  const filtered = (raw || []).filter(isQualityFinding);
+  if (filtered.length < raw.length) {
+    log.info('findings-filtered', { url: site.url, before: raw.length, after: filtered.length });
+  }
+  return filtered;
 }
 
 async function main() {
@@ -135,7 +169,9 @@ async function main() {
           url: f.url || site.url,
           source_url: f.url || site.url,
           finding_type: (f.resource_type || 'article').toLowerCase(),
-          source_domain: new URL(f.url || site.url).hostname,
+          classification: f.classification || '',
+          content_hash: f.content_hash || '',
+          source_domain: (() => { try { return new URL(f.url || site.url).hostname; } catch { return 'unknown'; } })(),
         });
       }
     }
@@ -150,7 +186,7 @@ async function main() {
     if (!config.dryRun) {
       try {
         const claimResult = await wp.claim([{
-          title: `${category} — ${sites[0].name || 'discovered resources'}`,
+          title: category,
           category,
           reason: `Found ${allFindings.length} real resources from verified websites`,
           confidence: 0.7,

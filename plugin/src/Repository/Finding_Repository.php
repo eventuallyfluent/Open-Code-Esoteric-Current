@@ -41,8 +41,14 @@ class Finding_Repository {
         }
 
         if (!empty($args['status'])) {
-            $where .= ' AND f.status = %s';
-            $params[] = $args['status'];
+            if (is_array($args['status'])) {
+                $placeholders = implode(',', array_fill(0, count($args['status']), '%s'));
+                $where .= " AND f.status IN ({$placeholders})";
+                $params = array_merge($params, $args['status']);
+            } else {
+                $where .= ' AND f.status = %s';
+                $params[] = $args['status'];
+            }
         }
         if (!empty($args['topic_id'])) {
             $where .= ' AND f.topic_id = %d';
@@ -88,7 +94,7 @@ class Finding_Repository {
     }
 
     public function get_published(array $args = []): array {
-        $args['status'] = 'approved';
+        $args['status'] = ['approved', 'published'];
         $args['exclude_blocked'] = true;
         return $this->get_all($args);
     }
@@ -139,7 +145,7 @@ class Finding_Repository {
             'relevance_score' => $finding['relevance_score'] ?? null,
             'confidence_score' => $finding['confidence_score'] ?? null,
             'classification' => $finding['classification'] ?? null,
-            'status' => 'awaiting_review',
+            'status' => 'approved',
         ];
 
         if ($existing) {
@@ -150,9 +156,24 @@ class Finding_Repository {
             $finding_id = $this->create($data);
         }
 
-        if ($finding_id && !empty($finding['classification'])) {
+        if ($finding_id) {
             $term_repo = new \EsotericCurrent\Core\Repository\Term_Repository();
-            $term_repo->migrate_classification_to_terms($finding['classification'], $finding_id);
+            if (!empty($finding['classification'])) {
+                $term_repo->migrate_classification_to_terms($finding['classification'], $finding_id);
+            }
+            $type_slug = $finding['finding_type'] ?? '';
+            $plural_map = [
+                'book' => 'books', 'article' => 'articles', 'course' => 'courses',
+                'teacher' => 'teachers', 'interview' => 'interviews',
+                'research-paper' => 'research-papers', 'event' => 'events',
+                'podcast' => 'podcasts', 'organization' => 'organizations',
+            ];
+            if ($type_slug && isset($plural_map[$type_slug])) {
+                $type_term = $term_repo->get_term_by_slug($plural_map[$type_slug], 'ec_resource_type');
+                if ($type_term) {
+                    $term_repo->add_object_term($finding_id, (int)$type_term['term_taxonomy_id']);
+                }
+            }
         }
 
         return $finding_id;

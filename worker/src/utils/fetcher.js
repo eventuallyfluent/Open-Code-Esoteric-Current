@@ -56,5 +56,6 @@ export function scoreLink(url, text) {
   if (/practitioner|ritual|initiation|tradition|teachings|wisdom|ancient|secret|sacred|grimoire|initiate|adept/i.test(t)) score += 2;
   if (/blog|podcast|zine|newsletter|forum|community|personal/i.test(u)) score += 3;
   if (/course|workshop|seminar|retreat|conference|festival/i.test(t)) score += 1;
+  if (/shop|store|products|catalogue|cart|checkout|wholesale|retail/i.test(u) || /buy|price|order|incense|candle/i.test(t)) score -= 3;
   return Math.max(0, Math.min(10, score));
 }
