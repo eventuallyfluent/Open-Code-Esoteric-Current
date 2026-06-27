@@ -16,22 +16,17 @@ class Claim_Controller {
 
     public static function check_auth(\WP_REST_Request $request): bool {
         $secret = ec_get_api_secret();
-        if (empty($secret)) {
-            return false;
-        }
+        if (empty($secret)) { return false; }
 
         $signature = $request->get_header('X-EC-Signature');
         $timestamp = $request->get_header('X-EC-Timestamp');
         $nonce = $request->get_header('X-EC-Nonce');
 
-        if (empty($signature) || empty($timestamp) || empty($nonce)) {
-            return false;
-        }
+        if (empty($signature) || empty($timestamp) || empty($nonce)) { return false; }
 
-        $rate_key = 'claim_' . $request->get_remote_addr();
-        if (!Rate_Limiter::check($rate_key, 30, 60)) {
-            return false;
-        }
+        $ip = $_SERVER['REMOTE_ADDR'] ?? $request->get_header('X-Forwarded-For') ?? 'unknown';
+        $rate_key = 'claim_' . md5($ip);
+        if (!Rate_Limiter::check($rate_key, 30, 60)) { return false; }
 
         return HMAC_Verifier::verify_request(
             'POST', '/ec/v1/claim', $request->get_body(),
@@ -48,48 +43,53 @@ class Claim_Controller {
         }
 
         $body = $request->get_json_params();
-        $submitted_topics = $body['topics'] ?? [];
+        $submitted = $body['topics'] ?? [];
 
-        $topic_repo = new \EsotericCurrent\Core\Repository\Research_Topic_Repository();
-        $agent_run_repo = new \EsotericCurrent\Core\Repository\Agent_Run_Repository();
+        if (empty($submitted)) {
+            return new \WP_REST_Response(['claimed' => false, 'runs' => [], 'message' => 'No topics submitted']);
+        }
 
-        $topic_ids = [];
+        global $wpdb;
+        $rt = $wpdb->prefix . 'ec_research_topics';
+        $found = [];
 
-        if (!empty($submitted_topics)) {
-            foreach ($submitted_topics as $t) {
-                $title = $t['title'] ?? '';
-                $category = $t['category'] ?? '';
-                if (empty($title)) { continue; }
+        foreach ($submitted as $t) {
+            $title = trim($t['title'] ?? '');
+            if ($title === '') { continue; }
 
-                $existing = $topic_repo->get_by_title($title);
-                if ($existing) {
-                    $topic_ids[] = $existing['id'];
-                } else {
-                    $id = $topic_repo->create([
-                        'title' => $title,
-                        'research_goal' => $t['reason'] ?? '',
-                        'included_concepts' => $category,
-                        'priority' => 5,
-                        'run_frequency' => 'daily',
-                        'status' => 'active',
-                        'next_run_at' => current_time('mysql'),
-                    ]);
-                    if ($id) { $topic_ids[] = $id; }
+            $existing = $wpdb->get_row(
+                $wpdb->prepare("SELECT id FROM $rt WHERE title = %s LIMIT 1", $title),
+                ARRAY_A
+            );
+            if ($existing) {
+                $found[] = (int)$existing['id'];
+            } else {
+                $ok = $wpdb->insert($rt, [
+                    'title' => $title,
+                    'research_goal' => $t['reason'] ?? '',
+                    'included_concepts' => $t['category'] ?? '',
+                    'priority' => 'normal',
+                    'run_frequency' => 'daily',
+                    'status' => 'active',
+                    'next_run_at' => current_time('mysql'),
+                    'created_at' => current_time('mysql'),
+                ]);
+                if ($ok && $wpdb->insert_id) {
+                    $found[] = $wpdb->insert_id;
                 }
             }
-        } else {
-            $due = $topic_repo->get_due_topics();
-            $topic_ids = array_column($due, 'id');
         }
 
-        if (empty($topic_ids)) {
-            return new \WP_REST_Response(['claimed' => false, 'topics' => [], 'message' => 'No topics to claim']);
+        if (empty($found)) {
+            return new \WP_REST_Response(['claimed' => false, 'runs' => [], 'message' => 'No topics to claim']);
         }
 
+        $agent_run_repo = new \EsotericCurrent\Core\Repository\Agent_Run_Repository();
+        $topic_repo = new \EsotericCurrent\Core\Repository\Research_Topic_Repository();
         $runs = [];
 
-        foreach ($topic_ids as $tid) {
-            $topic = $topic_repo->get_by_id($tid);
+        foreach ($found as $tid) {
+            $topic = $topic_repo->get_by_id((int)$tid);
             if ($topic === null) { continue; }
 
             $lease_token = bin2hex(random_bytes(32));
@@ -97,7 +97,6 @@ class Claim_Controller {
 
             $run = $agent_run_repo->create_run($topic['id'], 'claim');
             $agent_run_repo->set_lease($run['id'], hash('sha256', $lease_token), $lease_expires_at);
-
             $topic_repo->update($topic['id'], ['last_run_at' => current_time('mysql')]);
 
             $runs[] = [
@@ -109,10 +108,6 @@ class Claim_Controller {
             ];
         }
 
-        return new \WP_REST_Response([
-            'claimed' => true,
-            'topic_count' => count($runs),
-            'runs' => $runs,
-        ]);
+        return new \WP_REST_Response(['claimed' => true, 'topic_count' => count($runs), 'runs' => $runs]);
     }
 }
