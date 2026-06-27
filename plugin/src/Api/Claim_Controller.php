@@ -47,17 +47,51 @@ class Claim_Controller {
             return new \WP_REST_Response(['error' => 'Nonce already consumed'], 429);
         }
 
-        $topic_repo = new \EsotericCurrent\Core\Repository\Research_Topic_Repository();
-        $topics = $topic_repo->get_due_topics();
+        $body = $request->get_json_params();
+        $submitted_topics = $body['topics'] ?? [];
 
-        if (empty($topics)) {
-            return new \WP_REST_Response(['claimed' => false, 'topics' => [], 'message' => 'No due topics']);
+        $topic_repo = new \EsotericCurrent\Core\Repository\Research_Topic_Repository();
+        $agent_run_repo = new \EsotericCurrent\Core\Repository\Agent_Run_Repository();
+
+        $topic_ids = [];
+
+        if (!empty($submitted_topics)) {
+            foreach ($submitted_topics as $t) {
+                $title = $t['title'] ?? '';
+                $category = $t['category'] ?? '';
+                if (empty($title)) { continue; }
+
+                $existing = $topic_repo->get_by_title($title);
+                if ($existing) {
+                    $topic_ids[] = $existing['id'];
+                } else {
+                    $id = $topic_repo->create([
+                        'title' => $title,
+                        'research_goal' => $t['reason'] ?? '',
+                        'included_concepts' => $category,
+                        'priority' => 5,
+                        'run_frequency' => 'daily',
+                        'status' => 'active',
+                        'next_run_at' => current_time('mysql'),
+                    ]);
+                    if ($id) { $topic_ids[] = $id; }
+                }
+            }
+        } else {
+            $due = $topic_repo->get_due_topics();
+            $topic_ids = array_column($due, 'id');
         }
 
-        $agent_run_repo = new \EsotericCurrent\Core\Repository\Agent_Run_Repository();
+        if (empty($topic_ids)) {
+            return new \WP_REST_Response(['claimed' => false, 'topics' => [], 'message' => 'No topics to claim']);
+        }
+
         $runs = [];
 
-        foreach ($topics as $topic) {
+        foreach ($topic_ids as $tid) {
+            $topic = $topic_repo->get_by_id($tid);
+            if ($topic === null) { continue; }
+
             $lease_token = bin2hex(random_bytes(32));
             $lease_expires_at = gmdate('Y-m-d H:i:s', time() + 600);
 

@@ -19,6 +19,14 @@ class Research_Topic_Repository {
         return $row ?: null;
     }
 
+    public function get_by_title(string $title): ?array {
+        $row = $this->db->get_row(
+            $this->db->prepare("SELECT * FROM {$this->table} WHERE title = %s LIMIT 1", $title),
+            ARRAY_A
+        );
+        return $row ?: null;
+    }
+
     public function get_all(array $args = []): array {
         $where = '1=1';
         $params = [];
