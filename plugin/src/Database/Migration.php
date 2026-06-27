@@ -451,6 +451,15 @@ class Migration {
         dbDelta($sql);
     }
 
+    public function migrate_1_5_0(): void {
+        global $wpdb;
+        $table = $wpdb->prefix . 'ec_editorial_queue';
+        $indexes = $wpdb->get_results("SHOW INDEX FROM {$table} WHERE Key_name = 'uq_source_type_source_id'");
+        if (empty($indexes)) {
+            $wpdb->query("ALTER TABLE {$table} ADD UNIQUE KEY uq_source_type_source_id (source_type, source_id)");
+        }
+    }
+
     private function create_editorial_queue_table($wpdb): void {
         $table = $wpdb->prefix . 'ec_editorial_queue';
         $sql = "CREATE TABLE {$table} (
@@ -466,8 +475,8 @@ class Migration {
             transitioned_at DATETIME DEFAULT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_source_type_source_id (source_type, source_id),
             KEY idx_workflow_state (workflow_state),
-            KEY idx_source_type_source_id (source_type, source_id),
             KEY idx_topic_id (topic_id),
             KEY idx_issue_id (issue_id),
             KEY idx_assigned_to (assigned_to)

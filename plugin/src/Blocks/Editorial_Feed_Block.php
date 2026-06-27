@@ -85,6 +85,7 @@ class Editorial_Feed_Block {
         );
 
         $items = $wpdb->get_results($sql);
+        $items = self::deduplicate_by_source_id($items);
         if (empty($items)) {
             return '<div class="ec-feed-empty"><p>No published items yet.</p></div>';
         }
@@ -267,5 +268,18 @@ class Editorial_Feed_Block {
         if ($diff < 86400) return floor($diff / 3600) . 'h ago';
         if ($diff < 604800) return floor($diff / 86400) . 'd ago';
         return date('M j', $timestamp);
+    }
+
+    private static function deduplicate_by_source_id(array $items): array {
+        $seen = [];
+        $result = [];
+        foreach ($items as $item) {
+            $key = (int)$item->source_id;
+            if (!isset($seen[$key])) {
+                $seen[$key] = true;
+                $result[] = $item;
+            }
+        }
+        return $result;
     }
 }
