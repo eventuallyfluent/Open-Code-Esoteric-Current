@@ -1,9 +1,26 @@
-﻿Task 1: complete (commits 3b5ed75..0067d2a, review clean)
-Task 2: complete (commits 0067d2a..1971cad, review clean)
-Task 3: complete (commits 1971cad..059bfd6, review clean)
-Task 4: complete (commits 059bfd6..8aa3cf2, review clean)
-Phase3 Task 1: complete (commits 8aa3cf2..d1a2146, review clean)
-Phase3 Task 2: complete (commits d1a2146..d81717b, review clean)
-Phase3 Task 3: complete (commits d81717b..ec33b4a, review clean)
-Phase3 Task 4: complete (commits ec33b4a..89a5b43, review clean)
-Phase3 Task 5: complete (commits 89a5b43..80d37a4, review clean)
+﻿# SDD Progress Ledger
+
+## Task 1: Worker Source Domain Filtering
+- **Status:** DONE
+- **Commits:** a3bc5fd (impl), 07ef1e7 (fix: add encyclopedia.com, topic param)
+- **Review notes:** Added encyclopedia.com, topic param. All clear.
+
+## Task 2: Flags Database Table
+- **Status:** DONE
+- **Commits:** 978d92f (impl), a77d4ba (fix: reviewed bool, dbDelta, 1.2.0 placeholder)
+- **Review notes:** Fixed reviewed→reviewed_at column, added created_at index, switched to dbDelta, removed extra columns, added 1.2.0 placeholder.
+
+## Task 3: Flag REST Endpoint
+- **Status:** DONE
+- **Commits:** fa80d2f (impl), 683eef7 (fix: reason values, HTTP 201)
+- **Review notes:** Fixed allowed reasons to match spec, added 201 status code.
+
+## Task 4: Flags Admin Page
+- **Status:** DONE
+- **Commits:** 3e3113a (impl), 683eef7 (fix: admin links, action2, ORDER BY, admin notice)
+- **Review notes:** Fixed finding title links, bottom dropdown action2, unreviewed-first sort, added admin notice.
+
+## Task 5: Flag Button in Card UI
+- **Status:** DONE
+- **Commits:** a2db4c5 (impl)
+- **Review notes:** Approved clean.

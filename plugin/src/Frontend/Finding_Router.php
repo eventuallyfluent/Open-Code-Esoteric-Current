@@ -1,11 +1,15 @@
 <?php
 namespace EsotericCurrent\Core\Frontend;
 
+use EsotericCurrent\Core\Repository\Finding_Repository;
+use EsotericCurrent\Core\Repository\Term_Repository;
+
 class Finding_Router {
     public static function init(): void {
         add_rewrite_rule('^finding/(\d+)/?$', 'index.php?pagename=catalogue&ec_finding_id=$matches[1]', 'top');
         add_filter('query_vars', [self::class, 'add_query_var']);
         add_shortcode('ec_finding_detail', [self::class, 'render_shortcode']);
+        add_shortcode('ec_catalogue_page', [self::class, 'render_catalogue']);
     }
 
     public static function add_query_var(array $vars): array {
@@ -15,15 +19,26 @@ class Finding_Router {
 
     public static function render_shortcode(): string {
         $finding_id = (int)get_query_var('ec_finding_id');
-        if ($finding_id < 1) {
+        $topic_slug = get_query_var('ec_topic');
+        $type_slug = get_query_var('ec_resource_type');
+
+        if ($finding_id < 1 && empty($topic_slug) && empty($type_slug)) {
             return '<p>No item specified.</p>';
         }
 
-        $repo = new \EsotericCurrent\Core\Repository\Finding_Repository();
-        $finding = $repo->get_by_id($finding_id);
+        if ($finding_id < 1) {
+            return self::render_catalogue();
+        }
+
+        $f_repo = new Finding_Repository();
+        $t_repo = new Term_Repository();
+        $finding = $f_repo->get_by_id($finding_id);
         if ($finding === null || $finding['status'] === 'rejected') {
             return '<p>Item not found.</p>';
         }
+
+        $topic_terms = $t_repo->get_object_terms($finding_id, 'ec_topic');
+        $type_terms = $t_repo->get_object_terms($finding_id, 'ec_resource_type');
 
         ob_start();
         ?>
@@ -53,13 +68,37 @@ class Finding_Router {
                 <?php endif; ?>
             </div>
 
-            <?php if (!empty($finding['classification'])): ?>
+            <?php if (!empty($topic_terms)): ?>
+                <div class="ec-topics-bar">
+                    <span class="ec-topics-label">Topics</span>
+                    <span class="ec-topics-list">
+                        <?php foreach ($topic_terms as $term): ?>
+                            <a href="<?php echo esc_url(home_url('/topic/' . $term['slug'] . '/')); ?>" class="ec-topic-chip">
+                                <?php echo esc_html($term['name']); ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </span>
+                </div>
+            <?php elseif (!empty($finding['classification'])): ?>
                 <div class="ec-topics-bar">
                     <span class="ec-topics-label">Topics</span>
                     <span class="ec-topics-list">
                         <?php foreach (explode(',', $finding['classification']) as $topic): ?>
                             <a href="<?php echo esc_url(home_url('/?s=' . trim($topic))); ?>" class="ec-topic-chip">
                                 <?php echo esc_html(trim($topic)); ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </span>
+                </div>
+            <?php endif; ?>
+
+            <?php if (!empty($type_terms)): ?>
+                <div class="ec-topics-bar" style="margin-top:0.5rem">
+                    <span class="ec-topics-label">Type</span>
+                    <span class="ec-topics-list">
+                        <?php foreach ($type_terms as $term): ?>
+                            <a href="<?php echo esc_url(home_url('/type/' . $term['slug'] . '/')); ?>" class="ec-topic-chip">
+                                <?php echo esc_html($term['name']); ?>
                             </a>
                         <?php endforeach; ?>
                     </span>
@@ -95,5 +134,87 @@ class Finding_Router {
         </article>
         <?php
         return ob_get_clean();
+    }
+
+    public static function render_catalogue(): string {
+        $finding_id = (int)get_query_var('ec_finding_id');
+        $topic_slug = get_query_var('ec_topic');
+        $type_slug = get_query_var('ec_resource_type');
+
+        if ($finding_id > 0) {
+            return self::render_shortcode();
+        }
+
+        $f_repo = new Finding_Repository();
+        $t_repo = new Term_Repository();
+
+        $args = ['status' => 'approved', 'limit' => 50];
+        $title = 'Catalogue';
+
+        if (!empty($topic_slug)) {
+            $args['ec_topic'] = sanitize_title($topic_slug);
+            $term = $t_repo->get_term_by_slug($args['ec_topic'], 'ec_topic');
+            $title = $term ? esc_html($term['name']) : ucfirst(str_replace('-', ' ', $topic_slug));
+        } elseif (!empty($type_slug)) {
+            $args['ec_resource_type'] = sanitize_title($type_slug);
+            $term = $t_repo->get_term_by_slug($args['ec_resource_type'], 'ec_resource_type');
+            $title = $term ? esc_html($term['name']) : ucfirst(str_replace('-', ' ', $type_slug));
+        }
+
+        $findings = $f_repo->get_published($args);
+
+        ob_start();
+        ?>
+        <div class="ec-archive-header">
+            <h1 class="ec-archive-title"><?php echo esc_html($title); ?></h1>
+        </div>
+        <?php if (empty($findings)): ?>
+            <p class="ec-feed-empty">No published items found.</p>
+        <?php else: ?>
+            <div class="ec-feed-grid" style="--ec-feed-cols: 3">
+                <?php foreach ($findings as $finding): ?>
+                    <article class="ec-feed-card">
+                        <div class="ec-feed-card-top">
+                            <span class="ec-feed-type ec-feed-type--<?php echo esc_attr($finding['finding_type'] ?: 'default'); ?>">
+                                <span class="ec-feed-type-dot"></span>
+                                <?php echo esc_html(ucfirst($finding['finding_type'] ?: 'Finding')); ?>
+                            </span>
+                            <?php if (!empty($finding['confidence_score'])): ?>
+                                <span class="ec-feed-confidence"><?php echo round((float)$finding['confidence_score']); ?>%</span>
+                            <?php endif; ?>
+                        </div>
+                        <h3 class="ec-feed-card-title">
+                            <a href="<?php echo esc_url(home_url('/finding/' . (int)$finding['id'] . '/')); ?>">
+                                <?php echo esc_html($finding['title']); ?>
+                            </a>
+                        </h3>
+                        <div class="ec-feed-card-footer">
+                            <span class="ec-feed-card-source">
+                                <?php echo esc_html(parse_url($finding['source_url'] ?: $finding['url'], PHP_URL_HOST)); ?>
+                            </span>
+                            <?php if (!empty($finding['created_at'])): ?>
+                                <time class="ec-feed-card-date"><?php echo self::relative_time($finding['created_at']); ?></time>
+                            <?php endif; ?>
+                        </div>
+                        <?php if (!empty($finding['relevance_score'])): ?>
+                            <div class="ec-feed-card-relevance">
+                                <span class="ec-feed-card-relevance-bar" style="width:<?php echo round((float)$finding['relevance_score']); ?>%"></span>
+                            </div>
+                        <?php endif; ?>
+                    </article>
+                <?php endforeach; ?>
+            </div>
+        <?php endif;
+        return ob_get_clean();
+    }
+
+    private static function relative_time(string $datetime): string {
+        $timestamp = strtotime($datetime);
+        $diff = time() - $timestamp;
+        if ($diff < 60) return 'just now';
+        if ($diff < 3600) return floor($diff / 60) . 'm ago';
+        if ($diff < 86400) return floor($diff / 3600) . 'h ago';
+        if ($diff < 604800) return floor($diff / 86400) . 'd ago';
+        return date('M j', $timestamp);
     }
 }

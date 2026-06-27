@@ -23,7 +23,7 @@ class Flag_Controller {
     public static function handle(\WP_REST_Request $request): \WP_REST_Response {
         $finding_id = (int) $request->get_param('id');
         $reason = sanitize_text_field($request->get_json_params()['reason'] ?? '');
-        $ip_address = $request->get_remote_addr();
+        $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
         if (empty($reason)) {
             return new \WP_REST_Response(['error' => 'reason is required'], 400);

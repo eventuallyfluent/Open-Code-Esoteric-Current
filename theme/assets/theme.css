@@ -1150,15 +1150,6 @@ input:focus-visible {
 .ec-feed-card-title a:hover {
   color: var(--ec-gold);
 }
-.ec-feed-card-title a::after {
-  content: ' ↗';
-  font-size: 0.75em;
-  opacity: 0.4;
-  transition: opacity 0.2s;
-}
-.ec-feed-card-title a:hover::after {
-  opacity: 1;
-}
 .ec-feed-card-excerpt {
   font-size: 0.8125rem;
   line-height: 1.55;

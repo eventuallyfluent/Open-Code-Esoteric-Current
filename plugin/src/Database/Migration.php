@@ -46,6 +46,213 @@ class Migration {
         $this->create_finding_flags_table($wpdb);
     }
 
+    public function migrate_1_4_0(): void {
+        global $wpdb;
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        $this->create_terms_table($wpdb);
+        $this->create_term_taxonomy_table($wpdb);
+        $this->create_term_relationships_table($wpdb);
+        $this->seed_default_terms($wpdb);
+        $this->backfill_existing_classifications($wpdb);
+        set_transient('ec_flush_rewrite_rules', true, HOUR_IN_SECONDS);
+    }
+
+    public static function maybe_flush_rewrite_rules(): void {
+        if (get_transient('ec_flush_rewrite_rules')) {
+            delete_transient('ec_flush_rewrite_rules');
+            flush_rewrite_rules(false);
+        }
+    }
+
+    private function backfill_existing_classifications($wpdb): void {
+        $findings = $wpdb->get_results(
+            "SELECT id, classification FROM {$wpdb->prefix}ec_findings WHERE classification IS NOT NULL AND classification != ''",
+            ARRAY_A
+        );
+        if (empty($findings)) {
+            return;
+        }
+        $terms_table = $wpdb->prefix . 'ec_terms';
+        $tax_table = $wpdb->prefix . 'ec_term_taxonomy';
+        $rel_table = $wpdb->prefix . 'ec_term_relationships';
+
+        foreach ($findings as $finding) {
+            $tags = array_map('trim', explode(',', $finding['classification']));
+            $finding_id = (int)$finding['id'];
+            foreach ($tags as $tag) {
+                if (empty($tag)) continue;
+                $slug = sanitize_title($tag);
+                $ttid = $wpdb->get_var(
+                    $wpdb->prepare(
+                        "SELECT tt.id FROM {$tax_table} tt INNER JOIN {$terms_table} t ON tt.term_id = t.id WHERE t.slug = %s AND tt.taxonomy = 'ec_topic'",
+                        $slug
+                    )
+                );
+                if (!$ttid) continue;
+
+                $exists = $wpdb->get_var(
+                    $wpdb->prepare(
+                        "SELECT COUNT(*) FROM {$rel_table} WHERE object_id = %d AND term_taxonomy_id = %d",
+                        $finding_id, (int)$ttid
+                    )
+                );
+                if (!$exists) {
+                    $wpdb->insert($rel_table, [
+                        'object_id' => $finding_id,
+                        'term_taxonomy_id' => (int)$ttid,
+                        'term_order' => 0,
+                    ]);
+                }
+            }
+        }
+    }
+
+    private function create_terms_table($wpdb): void {
+        $table = $wpdb->prefix . 'ec_terms';
+        $sql = "CREATE TABLE {$table} (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(200) NOT NULL DEFAULT '',
+            slug VARCHAR(200) NOT NULL DEFAULT '',
+            term_group BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            UNIQUE KEY uk_slug (slug)
+        ) " . self::CHARSET;
+        dbDelta($sql);
+    }
+
+    private function create_term_taxonomy_table($wpdb): void {
+        $table = $wpdb->prefix . 'ec_term_taxonomy';
+        $sql = "CREATE TABLE {$table} (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            term_id BIGINT UNSIGNED NOT NULL,
+            taxonomy VARCHAR(32) NOT NULL DEFAULT '',
+            description LONGTEXT DEFAULT NULL,
+            parent BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            count BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            UNIQUE KEY uk_term_taxonomy (term_id, taxonomy),
+            KEY idx_taxonomy (taxonomy),
+            KEY idx_parent (parent)
+        ) " . self::CHARSET;
+        dbDelta($sql);
+    }
+
+    private function create_term_relationships_table($wpdb): void {
+        $table = $wpdb->prefix . 'ec_term_relationships';
+        $sql = "CREATE TABLE {$table} (
+            object_id BIGINT UNSIGNED NOT NULL,
+            term_taxonomy_id BIGINT UNSIGNED NOT NULL,
+            term_order INT NOT NULL DEFAULT 0,
+            UNIQUE KEY uk_object_term (object_id, term_taxonomy_id),
+            KEY idx_term_taxonomy_id (term_taxonomy_id),
+            KEY idx_object_id (object_id)
+        ) " . self::CHARSET;
+        dbDelta($sql);
+    }
+
+    private function seed_default_terms($wpdb): void {
+        $terms_table = $wpdb->prefix . 'ec_terms';
+        $tax_table = $wpdb->prefix . 'ec_term_taxonomy';
+
+        $topic_groups = [
+            'western-esoteric-tradition' => 'Western Esoteric Tradition',
+            'eastern-esoteric-traditions' => 'Eastern Esoteric Traditions',
+            'indigenous-earth-traditions' => 'Indigenous & Earth Traditions',
+            'contemporary-esoteric' => 'Contemporary Esoteric',
+            'academic-interdisciplinary' => 'Academic & Interdisciplinary',
+        ];
+
+        $topic_children = [
+            'western-esoteric-tradition' => [
+                'hermeticism' => 'Hermeticism',
+                'alchemy' => 'Alchemy',
+                'astrology' => 'Astrology',
+                'ceremonial-magic' => 'Ceremonial Magic',
+                'kabbalah' => 'Kabbalah',
+                'gnosticism' => 'Gnosticism',
+                'esoteric-christianity' => 'Esoteric Christianity',
+                'mysticism' => 'Mysticism',
+                'rosicrucianism' => 'Rosicrucianism',
+                'theosophy' => 'Theosophy',
+                'neoplatonism' => 'Neoplatonism',
+            ],
+            'eastern-esoteric-traditions' => [
+                'dzogchen' => 'Dzogchen',
+                'esoteric-buddhism' => 'Esoteric Buddhism',
+                'tantra' => 'Tantra',
+                'taoist-alchemy' => 'Taoist Alchemy',
+                'sufism' => 'Sufism',
+            ],
+            'indigenous-earth-traditions' => [
+                'shamanism' => 'Shamanism',
+                'paganism' => 'Paganism',
+            ],
+            'contemporary-esoteric' => [
+                'occultism' => 'Occultism',
+                'chaos-magic' => 'Chaos Magic',
+                'spiritual-practice' => 'Spiritual Practice',
+                'psychedelics' => 'Psychedelics',
+                'enochian' => 'Enochian',
+            ],
+            'academic-interdisciplinary' => [
+                'consciousness-studies' => 'Consciousness Studies',
+                'alternative-history' => 'Alternative History',
+            ],
+        ];
+
+        $resource_types = [
+            'books' => 'Books',
+            'courses' => 'Courses',
+            'teachers' => 'Teachers',
+            'schools' => 'Schools',
+            'events' => 'Events',
+            'podcasts' => 'Podcasts',
+            'videos' => 'Videos',
+            'articles' => 'Articles',
+            'research-papers' => 'Research Papers',
+            'communities' => 'Communities',
+            'apps' => 'Apps',
+            'archives' => 'Archives',
+            'manuscripts' => 'Manuscripts',
+            'museums' => 'Museums',
+            'publishers' => 'Publishers',
+            'news' => 'News',
+            'interviews' => 'Interviews',
+            'reviews' => 'Reviews',
+            'organizations' => 'Organizations',
+            'people' => 'People',
+        ];
+
+        foreach ($topic_groups as $slug => $name) {
+            $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$terms_table} WHERE slug = %s", $slug));
+            if (!$exists) {
+                $wpdb->insert($terms_table, ['name' => $name, 'slug' => $slug, 'term_group' => 0]);
+                $term_id = $wpdb->insert_id;
+                $wpdb->insert($tax_table, ['term_id' => $term_id, 'taxonomy' => 'ec_topic', 'description' => '', 'parent' => 0, 'count' => 0]);
+            }
+        }
+
+        foreach ($topic_children as $parent_slug => $children) {
+            $parent = $wpdb->get_row($wpdb->prepare("SELECT t.id, tt.id as ttid FROM {$terms_table} t LEFT JOIN {$tax_table} tt ON t.id = tt.term_id AND tt.taxonomy = 'ec_topic' WHERE t.slug = %s", $parent_slug));
+            $parent_ttid = $parent ? (int)$parent->ttid : 0;
+            foreach ($children as $slug => $name) {
+                $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$terms_table} WHERE slug = %s", $slug));
+                if (!$exists) {
+                    $wpdb->insert($terms_table, ['name' => $name, 'slug' => $slug, 'term_group' => 0]);
+                    $term_id = $wpdb->insert_id;
+                    $wpdb->insert($tax_table, ['term_id' => $term_id, 'taxonomy' => 'ec_topic', 'description' => '', 'parent' => $parent_ttid, 'count' => 0]);
+                }
+            }
+        }
+
+        foreach ($resource_types as $slug => $name) {
+            $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$terms_table} WHERE slug = %s", $slug));
+            if (!$exists) {
+                $wpdb->insert($terms_table, ['name' => $name, 'slug' => $slug, 'term_group' => 0]);
+                $term_id = $wpdb->insert_id;
+                $wpdb->insert($tax_table, ['term_id' => $term_id, 'taxonomy' => 'ec_resource_type', 'description' => '', 'parent' => 0, 'count' => 0]);
+            }
+        }
+    }
+
     private function create_sources_table($wpdb): void {
         $table = $wpdb->prefix . 'ec_sources';
         $sql = "CREATE TABLE {$table} (

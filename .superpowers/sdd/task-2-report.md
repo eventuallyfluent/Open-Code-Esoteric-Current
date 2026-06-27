@@ -1,20 +1,30 @@
-# Task 2 Report — All Template Files
+# Task 2 Report: Database Migration (ec_finding_flags table)
 
-**Status:** DONE
+## What I implemented
 
-**Commit:** `1971cad` — `feat(theme): all template files — home, single, page, archive, search, 404, submission`
+- Added `1.3.0` to the migration versions array in `Schema.php`
+- Added `migrate_1_3_0()` public method to `Migration.php`
+- Added `create_finding_flags_table()` private method to `Migration.php`
 
-**Files created (7):**
-- `theme/templates/home.html` — Blog home with masthead pattern, query loop (perPage:10), pagination
-- `theme/templates/single.html` — Single post with featured image, title, meta (date/category/tags), thin separators, prev/next nav
-- `theme/templates/page.html` — Static page with title and content only
-- `theme/templates/archive.html` — Archive with query-title, term-description, thin separator, query loop with pagination
-- `theme/templates/search.html` — Search with input, query-title, thin separator, post-title/excerpt loop
-- `theme/templates/404.html` — Centered "Not Found" heading, paragraph, search form
-- `theme/templates/submission.html` — Custom template with post-title, content, and `wp:ec/submission-form` block
+## Files changed
 
-**Verification:** All 7 files created, 139 insertions across them. Templates consume `header`/`footer` template parts from Task 1.
+| File | Change |
+|------|--------|
+| `plugin/src/Database/Schema.php:28` | Added `'1.3.0'` to version list |
+| `plugin/src/Database/Migration.php:39-42` | Added `migrate_1_3_0()` method |
+| `plugin/src/Database/Migration.php:282-298` | Added `create_finding_flags_table()` method |
 
-**Test summary:** WordPress block markup — no runtime tests to run at template level.
+## Self-review findings
 
-**Concerns:** None.
+| Check | Status | Notes |
+|-------|--------|-------|
+| Table prefix (`ec_`) | ✓ | `$wpdb->prefix . 'ec_finding_flags'` |
+| Indexes | ✓ | `idx_finding_id` on `finding_id`, `idx_unreviewed` on `reviewed_at` |
+| Foreign keys | ✓ | No explicit FK constraints (consistent with existing tables) |
+| Charset/collation | ✓ | Uses `self::CHARSET` (`utf8mb4_unicode_ci`, InnoDB) |
+| Column types | ✓ | `finding_id BIGINT UNSIGNED` matches `ec_findings.id` type |
+| IPv6 support | ✓ | `ip_address VARCHAR(45)` supports IPv4 and IPv6 |
+
+## Concerns
+
+- The plan uses `$wpdb->query()` with `CREATE TABLE IF NOT EXISTS` instead of `dbDelta()` like all other tables. This is intentional per the plan spec but is an inconsistency. `dbDelta()` handles incremental schema changes; `CREATE TABLE IF NOT EXISTS` is idempotent but won't alter an existing table if the schema changes later.

@@ -19,32 +19,71 @@ class Finding_Repository {
         return $row ?: null;
     }
 
+    private const BLOCKED_DOMAINS = ['wikipedia.org', 'archive.org', 'encyclopedia.com', 'britannica.com'];
+
     public function get_all(array $args = []): array {
         $where = '1=1';
         $params = [];
+        $joins = [];
+
+        if (!empty($args['exclude_blocked'])) {
+            foreach (self::BLOCKED_DOMAINS as $b) {
+                $where .= ' AND COALESCE(f.source_url, f.url) NOT LIKE %s';
+                $params[] = '%' . $this->db->esc_like($b);
+            }
+        }
 
         if (!empty($args['status'])) {
-            $where .= ' AND status = %s';
+            $where .= ' AND f.status = %s';
             $params[] = $args['status'];
         }
         if (!empty($args['topic_id'])) {
-            $where .= ' AND topic_id = %d';
+            $where .= ' AND f.topic_id = %d';
             $params[] = (int)$args['topic_id'];
         }
         if (!empty($args['finding_type'])) {
-            $where .= ' AND finding_type = %s';
+            $where .= ' AND f.finding_type = %s';
             $params[] = $args['finding_type'];
+        }
+        if (!empty($args['ec_topic'])) {
+            $rel_table = $this->db->prefix . 'ec_term_relationships';
+            $tax_table = $this->db->prefix . 'ec_term_taxonomy';
+            $terms_table = $this->db->prefix . 'ec_terms';
+            $joins[] = "INNER JOIN {$rel_table} r ON f.id = r.object_id";
+            $joins[] = "INNER JOIN {$tax_table} tt ON r.term_taxonomy_id = tt.id AND tt.taxonomy = 'ec_topic'";
+            $joins[] = "INNER JOIN {$terms_table} t ON tt.term_id = t.id";
+            $where .= ' AND t.slug = %s';
+            $params[] = $args['ec_topic'];
+        }
+        if (!empty($args['ec_resource_type'])) {
+            $rel_table = $this->db->prefix . 'ec_term_relationships';
+            $tax_table = $this->db->prefix . 'ec_term_taxonomy';
+            $terms_table = $this->db->prefix . 'ec_terms';
+            $joins[] = "INNER JOIN {$rel_table} r2 ON f.id = r2.object_id";
+            $joins[] = "INNER JOIN {$tax_table} tt2 ON r2.term_taxonomy_id = tt2.id AND tt2.taxonomy = 'ec_resource_type'";
+            $joins[] = "INNER JOIN {$terms_table} t2 ON tt2.term_id = t2.id";
+            $where .= ' AND t2.slug = %s';
+            $params[] = $args['ec_resource_type'];
         }
 
         $limit = !empty($args['limit']) ? min((int)$args['limit'], 100) : 50;
         $offset = !empty($args['offset']) ? (int)$args['offset'] : 0;
 
+        $from = $this->table . ' f';
+        $join_sql = !empty($joins) ? ' ' . implode(' ', $joins) : '';
+
         $sql = $this->db->prepare(
-            "SELECT * FROM {$this->table} WHERE {$where} ORDER BY created_at DESC LIMIT %d OFFSET %d",
+            "SELECT f.* FROM {$from}{$join_sql} WHERE {$where} ORDER BY f.created_at DESC LIMIT %d OFFSET %d",
             array_merge($params, [$limit, $offset])
         );
 
         return $this->db->get_results($sql, ARRAY_A) ?: [];
+    }
+
+    public function get_published(array $args = []): array {
+        $args['status'] = 'approved';
+        $args['exclude_blocked'] = true;
+        return $this->get_all($args);
     }
 
     public function get_by_hash(string $hash): ?array {
@@ -76,7 +115,7 @@ class Finding_Repository {
     }
 
     public function create_from_agent(array $finding, int $run_id, ?int $topic_id): ?int {
-        return $this->create([
+        $finding_id = $this->create([
             'run_id' => $run_id,
             'topic_id' => $topic_id,
             'finding_type' => $finding['finding_type'] ?? 'article',
@@ -92,6 +131,13 @@ class Finding_Repository {
             'classification' => $finding['classification'] ?? null,
             'status' => 'awaiting_review',
         ]);
+
+        if ($finding_id && !empty($finding['classification'])) {
+            $term_repo = new \EsotericCurrent\Core\Repository\Term_Repository();
+            $term_repo->migrate_classification_to_terms($finding['classification'], $finding_id);
+        }
+
+        return $finding_id;
     }
 
     public function update(int $id, array $data): bool {

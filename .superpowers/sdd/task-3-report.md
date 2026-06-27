@@ -1,38 +1,41 @@
-# Task 3 Report: Template parts and patterns
+# Task 3 Report: Flag REST Endpoint
 
-## Status: Complete
+## What I implemented
 
-## Steps Completed
+Created `Flag_Controller.php` — an anonymous REST endpoint that accepts flag submissions against findings:
 
-| Step | File | Status |
-|------|------|--------|
-| 1 | `theme/parts/masthead.html` | Created |
-| 2 | `theme/parts/signals-rail.html` | Created |
-| 3 | `theme/parts/policy-strip.html` | Created |
-| 4 | `theme/patterns/masthead.php` | Created |
-| 5 | `theme/functions.php` | Modified — added `init` hook loading `patterns/masthead.php` |
-| 6 | Commit | Done |
+- **Route:** `POST /ec/v1/finding/{id}/flag`
+- **Auth:** Anonymous (`__return_true` permission callback)
+- **Rate limit:** 5 requests per 60 seconds per IP (via `Rate_Limiter`)
+- **Body:** `{ "reason": "inaccurate|harmful|plagiarism|spam|other" }`
+- **Validation:** finding must exist (checked via `Finding_Repository::get_by_id()`), reason must be one of 5 allowed values
+- **Insert:** Records finding_id, reason, ip_address, reviewed=0 into `ec_finding_flags`
+- **Response:** `{ "success": true, "flag_id": <int> }` or standard error format
 
-## Commit
+## Files changed
 
-```
-3c135c2 feat(theme): template parts and masthead pattern
-```
+| File | Change |
+|------|--------|
+| `plugin/src/Api/Flag_Controller.php` | Created — 70-line controller class |
+| `plugin/src/Plugin.php` | Added `use` import + `rest_api_init` registration for Flag_Controller |
 
-Files: `theme/parts/masthead.html`, `theme/parts/signals-rail.html`, `theme/parts/policy-strip.html`, `theme/patterns/masthead.php`, `theme/functions.php`
+## Self-review findings
 
-## Verification
-
-- All 3 template part files created under `theme/parts/` with correct WordPress block markup
-- `theme/patterns/masthead.php` created with `register_block_pattern` call using slug `observatory-index/masthead`
-- `theme/functions.php` updated with `add_action('init', ...)` hook that `require_once`s the pattern file
-- Git commit logged with 5 files, 35 insertions
+| Check | Status | Notes |
+|-------|--------|-------|
+| Route format | ✓ | Matches `ec/v1` namespace, uses regex `(?P<id>\d+)` for path param |
+| Registration order | ✓ | Placed after Claim_Controller in Plugin.php, before Article_Controller |
+| Anonymous access | ✓ | `permission_callback => '__return_true'` |
+| IP-based rate limit | ✓ | `Rate_Limiter::check('flag_' . $ip, 5, 60)` — consistent with existing pattern |
+| IP capture | ✓ | `$request->get_remote_addr()` — IPv4 and IPv6 compatible (VARCHAR(45) in schema) |
+| Reason validation | ✓ | Whitelist of 5 allowed values with descriptive error |
+| Finding existence check | ✓ | `Finding_Repository::get_by_id()` — returns 404 if not found |
+| DB insert | ✓ | Direct `$wpdb->insert()` matching the `ec_finding_flags` table columns |
+| Response format | ✓ | `WP_REST_Response` with same success/error shape as other controllers |
+| Nonce usage | N/A | Flag endpoint is anonymous — no HMAC/nonce needed |
+| CSRF protection | N/A | WordPress REST API provides CSRF via `_wpnonce` for authenticated requests; anonymous POST is inherently limited by rate limiting |
 
 ## Concerns
 
-- The pattern file calls `register_block_pattern` from within the `ObservatoryIndex` namespace context (inherited via `require_once`). PHP's function fallback resolves unqualified calls to global, so this works — but a leading `\` could be added for explicitness.
-- No runtime test possible without a WordPress instance.
-
-## Report file
-
-`C:\Dev\Open Code Esoteric Current\.superpowers\sdd\task-3-report.md`
+- The endpoint uses `$wpdb->insert()` directly (no dedicated repository for flags). This is acceptable since there's no existing `Flag_Repository` and a single-table insert doesn't warrant one yet — but if flag CRUD grows, extracting a repository would be clean.
+- No brute-force protection beyond rate limiting. This is consistent with other anonymous endpoints in the codebase.

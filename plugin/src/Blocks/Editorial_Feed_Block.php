@@ -8,6 +8,8 @@ class Editorial_Feed_Block {
             'show_excerpt' => ['type' => 'boolean', 'default' => true],
             'display' => ['type' => 'string', 'default' => 'grid'],
             'columns' => ['type' => 'number', 'default' => 3],
+            'ec_topic' => ['type' => 'string', 'default' => ''],
+            'ec_resource_type' => ['type' => 'string', 'default' => ''],
         ];
     }
 
@@ -17,6 +19,42 @@ class Editorial_Feed_Block {
         $display = $attributes['display'] ?? 'grid';
         $show_excerpt = !empty($attributes['show_excerpt']);
         $columns = min(max((int)($attributes['columns'] ?? 3), 1), 4);
+        $ec_topic = $attributes['ec_topic'] ?? '';
+        $ec_resource_type = $attributes['ec_resource_type'] ?? '';
+
+        $joins = [];
+        $where = 'eq.workflow_state = %s';
+        $params = ['published'];
+
+        if (!empty($ec_topic)) {
+            $rel = $wpdb->prefix . 'ec_term_relationships';
+            $tt = $wpdb->prefix . 'ec_term_taxonomy';
+            $t = $wpdb->prefix . 'ec_terms';
+            $joins[] = "INNER JOIN {$rel} r ON f.id = r.object_id";
+            $joins[] = "INNER JOIN {$tt} ON r.term_taxonomy_id = {$tt}.id AND {$tt}.taxonomy = 'ec_topic'";
+            $joins[] = "INNER JOIN {$t} ON {$tt}.term_id = {$t}.id";
+            $where .= ' AND ' . $t . '.slug = %s';
+            $params[] = sanitize_title($ec_topic);
+        }
+
+        if (!empty($ec_resource_type)) {
+            $rel2 = $wpdb->prefix . 'ec_term_relationships';
+            $tt2 = $wpdb->prefix . 'ec_term_taxonomy';
+            $t2 = $wpdb->prefix . 'ec_terms';
+            $joins[] = "INNER JOIN {$rel2} r2 ON f.id = r2.object_id";
+            $joins[] = "INNER JOIN {$tt2} ON r2.term_taxonomy_id = {$tt2}.id AND {$tt2}.taxonomy = 'ec_resource_type'";
+            $joins[] = "INNER JOIN {$t2} ON {$tt2}.term_id = {$t2}.id";
+            $where .= ' AND ' . $t2 . '.slug = %s';
+            $params[] = sanitize_title($ec_resource_type);
+        }
+
+        $blocked = ['wikipedia.org', 'archive.org', 'encyclopedia.com', 'britannica.com'];
+        foreach ($blocked as $b) {
+            $where .= ' AND COALESCE(f.source_url, f.url) NOT LIKE %s';
+            $params[] = '%' . $wpdb->esc_like($b);
+        }
+
+        $join_sql = !empty($joins) ? ' ' . implode(' ', $joins) : '';
 
         $sql = $wpdb->prepare(
             "SELECT eq.*, f.title, f.excerpt, f.url, f.source_url,
@@ -24,10 +62,11 @@ class Editorial_Feed_Block {
                     f.classification, f.created_at
              FROM {$wpdb->prefix}ec_editorial_queue eq
              LEFT JOIN {$wpdb->prefix}ec_findings f ON (eq.source_type = 'finding' AND eq.source_id = f.id)
-             WHERE eq.workflow_state = %s
+             {$join_sql}
+             WHERE {$where}
              ORDER BY eq.updated_at DESC
              LIMIT %d",
-            'published', $count
+            array_merge($params, [$count])
         );
 
         $items = $wpdb->get_results($sql);
@@ -117,7 +156,7 @@ class Editorial_Feed_Block {
                         <?php endif; ?>
                     </div>
                     <h3 class="ec-feed-card-title">
-                        <a href="<?php echo esc_url($item->url); ?>" target="_blank" rel="noopener">
+                        <a href="<?php echo esc_url(home_url('/finding/' . (int)$item->source_id . '/')); ?>">
                             <?php echo esc_html($item->title); ?>
                         </a>
                     </h3>
@@ -155,7 +194,7 @@ class Editorial_Feed_Block {
                         <span class="ec-feed-type-dot" aria-hidden="true"></span>
                         <?php echo esc_html(ucfirst($item->finding_type ?: 'Finding')); ?>
                     </span>
-                    <h3><a href="<?php echo esc_url($item->url); ?>" target="_blank" rel="noopener"><?php echo esc_html($item->title); ?></a></h3>
+                    <h3><a href="<?php echo esc_url(home_url('/finding/' . (int)$item->source_id . '/')); ?>"><?php echo esc_html($item->title); ?></a></h3>
                     <?php if ($show_excerpt && !empty($item->excerpt)): ?>
                         <p class="ec-feed-excerpt"><?php echo esc_html(mb_substr($item->excerpt, 0, 200)); ?></p>
                     <?php endif; ?>
