@@ -22,6 +22,14 @@ class Editorial_Feed_Block {
         $ec_topic = $attributes['ec_topic'] ?? '';
         $ec_resource_type = $attributes['ec_resource_type'] ?? '';
 
+        if (empty($ec_resource_type) && !empty($_GET['ec_tab'])) {
+            $tab_map = ['books' => 'book', 'courses' => 'course', 'research' => 'research-paper', 'events' => 'event', 'podcasts' => 'podcast', 'teachers' => 'teacher', 'organizations' => 'organization'];
+            $tab = sanitize_key($_GET['ec_tab']);
+            if (isset($tab_map[$tab])) {
+                $ec_resource_type = $tab_map[$tab];
+            }
+        }
+
         $joins = [];
         $where = 'eq.workflow_state = %s';
         $params = ['published'];
@@ -141,7 +149,7 @@ class Editorial_Feed_Block {
 
     private static function render_grid(array $items, bool $show_excerpt, int $columns): void {
         ?>
-        <div class="ec-feed-grid" style="--ec-feed-cols: <?php echo $columns; ?>">
+        <div class="ec-feed-grid">
             <?php foreach ($items as $item): ?>
                 <article class="ec-feed-card">
                     <div class="ec-feed-card-top">
@@ -149,11 +157,6 @@ class Editorial_Feed_Block {
                             <span class="ec-feed-type-dot" aria-hidden="true"></span>
                             <?php echo esc_html(ucfirst($item->finding_type ?: 'Finding')); ?>
                         </span>
-                        <?php if (!empty($item->confidence_score)): ?>
-                            <span class="ec-feed-confidence" title="Confidence: <?php echo esc_attr($item->confidence_score); ?>%">
-                                <?php echo round((float)$item->confidence_score); ?>%
-                            </span>
-                        <?php endif; ?>
                     </div>
                     <h3 class="ec-feed-card-title">
                         <a href="<?php echo esc_url(home_url('/finding/' . (int)$item->source_id . '/')); ?>">
@@ -161,24 +164,30 @@ class Editorial_Feed_Block {
                         </a>
                     </h3>
                     <?php if ($show_excerpt && !empty($item->excerpt)): ?>
-                        <p class="ec-feed-card-excerpt"><?php echo esc_html(mb_substr($item->excerpt, 0, 200)); ?></p>
+                        <p class="ec-feed-card-excerpt"><?php echo esc_html($item->excerpt); ?></p>
                     <?php endif; ?>
                     <div class="ec-feed-card-footer">
                         <span class="ec-feed-card-source">
                             <?php echo esc_html(self::extract_domain($item->source_url ?: $item->url)); ?>
                         </span>
+                        <span class="ec-feed-card-meta-sep" aria-hidden="true">·</span>
                         <?php if (!empty($item->created_at)): ?>
                             <time class="ec-feed-card-date" datetime="<?php echo esc_attr($item->created_at); ?>">
-                                <?php echo self::relative_time($item->created_at); ?>
+                                Added <?php echo self::relative_time($item->created_at); ?>
                             </time>
                         <?php endif; ?>
-                        <button class="ec-flag-btn" data-finding-id="<?php echo (int)$item->source_id; ?>" type="button" title="Report issue" aria-label="Report issue with this finding">⚑</button>
+                        <button class="ec-save-btn" data-finding-id="<?php echo (int)$item->source_id; ?>" type="button" title="Save" aria-label="Save finding">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                            </svg>
+                        </button>
+                        <button class="ec-flag-btn" data-finding-id="<?php echo (int)$item->source_id; ?>" type="button" title="Report issue" aria-label="Report issue with this finding">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                                <line x1="4" y1="22" x2="4" y2="15" />
+                            </svg>
+                        </button>
                     </div>
-                    <?php if (!empty($item->relevance_score)): ?>
-                        <div class="ec-feed-card-relevance" aria-label="Relevance: <?php echo esc_attr($item->relevance_score); ?>%">
-                            <span class="ec-feed-card-relevance-bar" style="width:<?php echo round((float)$item->relevance_score); ?>%"></span>
-                        </div>
-                    <?php endif; ?>
                 </article>
             <?php endforeach; ?>
         </div>
@@ -196,14 +205,11 @@ class Editorial_Feed_Block {
                     </span>
                     <h3><a href="<?php echo esc_url(home_url('/finding/' . (int)$item->source_id . '/')); ?>"><?php echo esc_html($item->title); ?></a></h3>
                     <?php if ($show_excerpt && !empty($item->excerpt)): ?>
-                        <p class="ec-feed-excerpt"><?php echo esc_html(mb_substr($item->excerpt, 0, 200)); ?></p>
+                        <p class="ec-feed-excerpt"><?php echo esc_html($item->excerpt); ?></p>
                     <?php endif; ?>
                     <div class="ec-feed-meta">
                         <span><?php echo esc_html(self::extract_domain($item->source_url ?: $item->url)); ?></span>
-                        <?php if (!empty($item->created_at)): ?>
-                            <time><?php echo self::relative_time($item->created_at); ?></time>
-                        <?php endif; ?>
-                        <button class="ec-flag-btn" data-finding-id="<?php echo (int)$item->source_id; ?>" type="button" title="Report issue" aria-label="Report issue with this finding">⚑</button>
+                        <time><?php echo self::relative_time($item->created_at); ?></time>
                     </div>
                 </li>
             <?php endforeach; ?>

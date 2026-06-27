@@ -16,6 +16,7 @@ export function createDeepSeekClient(config, log) {
           messages,
           temperature,
           max_tokens: maxTokens,
+          enable_search: true,
         }),
       });
       if (!res.ok) {

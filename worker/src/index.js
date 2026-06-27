@@ -4,7 +4,6 @@ import { createDeepSeekClient } from './deepseek.js';
 import { createWordPressClient } from './wordpress.js';
 import { createResearchAgent } from './agents/research.js';
 import { createCollectorAgent } from './agents/collector.js';
-import { createSynthesizerAgent } from './agents/synthesizer.js';
 
 const ESOTERIC_CATEGORIES = [
   'Hermeticism', 'Alchemy', 'Astrology', 'Ceremonial Magic',
@@ -44,7 +43,7 @@ async function main() {
   let topics;
   if (config.dryRun) {
     topics = [
-      { title: 'Test Topic', category: 'Hermeticism', reason: 'Dry run test', confidence: 0.5 },
+      { title: 'New book on Hermetic astrology', category: 'Hermeticism', reason: 'Recently published title from Inner Traditions', confidence: 0.5 },
     ];
     log.info('dry-run: using mock topics');
   } else {
@@ -67,18 +66,17 @@ async function main() {
   }
 
   const collector = createCollectorAgent(deepseek);
-  const synthesizer = createSynthesizerAgent(deepseek);
 
-  function filterBriefingSources(briefing, topicTitle, log) {
-    if (!briefing.sources || !Array.isArray(briefing.sources)) return;
-    const before = briefing.sources.length;
-    briefing.sources = briefing.sources.filter(src => {
-      if (!src.url) return true;
+  function filterSources(sources, topicTitle, log) {
+    if (!sources || !Array.isArray(sources)) return [];
+    const before = sources.length;
+    const filtered = sources.filter(src => {
+      if (!src.url) return false;
       let hostname;
       try {
         hostname = new URL(src.url).hostname;
       } catch {
-        return true;
+        return false;
       }
       const blocked = [...BLOCKED_DOMAINS].some(domain =>
         hostname === domain || hostname.endsWith('.' + domain)
@@ -88,10 +86,11 @@ async function main() {
       }
       return !blocked;
     });
-    const filtered = before - briefing.sources.length;
-    if (filtered > 0) {
-      log.info('sources-filtered', { topic: topicTitle, before, after: briefing.sources.length, filtered });
+    const removed = before - filtered.length;
+    if (removed > 0) {
+      log.info('sources-filtered', { topic: topicTitle, before, after: filtered.length, removed });
     }
+    return filtered;
   }
 
   async function processRun(run) {
@@ -99,55 +98,50 @@ async function main() {
     log.info('process-topic', { title: topic.title, runUuid: run.run_uuid });
 
     const briefing = await collector.deepDive(topic);
-    if (!briefing) {
-      log.warn('collect-failed', { title: topic.title });
+    if (!briefing || !briefing.sources || briefing.sources.length === 0) {
+      log.warn('no-sources-found', { title: topic.title });
       if (!config.dryRun) {
-        await wp.sendCallback({ run_uuid: run.run_uuid, status: 'failed', error: { code: 'collect_failed', message: 'Agent could not compile briefing' } });
+        await wp.sendCallback({ run_uuid: run.run_uuid, status: 'completed', findings: [] });
       }
       return null;
     }
-    log.info('collect-complete', { title: topic.title, keyPoints: briefing.key_points?.length ?? 0, sourcesBeforeFilter: briefing.sources?.length ?? 0 });
+    log.info('collect-complete', { title: topic.title, sources: briefing.sources.length });
 
-    filterBriefingSources(briefing, topic.title, log);
-
-    const article = await synthesizer.synthesize(briefing);
-    if (!article) {
-      log.warn('synthesize-failed', { title: topic.title });
+    const sources = filterSources(briefing.sources, topic.title, log);
+    if (sources.length === 0) {
+      log.warn('all-sources-filtered', { title: topic.title });
       if (!config.dryRun) {
-        await wp.sendCallback({ run_uuid: run.run_uuid, status: 'failed', error: { code: 'synthesize_failed', message: 'Agent could not generate article' } });
+        await wp.sendCallback({ run_uuid: run.run_uuid, status: 'completed', findings: [] });
       }
       return null;
     }
-    log.info('synthesize-complete', { title: article.title, wordCount: article.content?.length ?? 0 });
 
     if (!config.dryRun) {
-      const submitResult = await wp.submitArticle({
-        title: article.title,
-        content: article.content,
-        excerpt: article.excerpt,
-        tags: article.tags,
-        source_category: topic.category || topic.category_name,
-        research_notes: JSON.stringify(briefing),
-      });
-      log.info('article-submitted', { title: article.title, postId: submitResult.post_id });
+      const findings = sources.map(src => ({
+        title: briefing.title || src.title || topic.title,
+        excerpt: src.relevance || '',
+        url: src.url,
+        source_url: src.url,
+        finding_type: topic.category?.toLowerCase().replace(/\s+/g, '-') || 'resource',
+        source_domain: new URL(src.url).hostname,
+      }));
 
       await wp.sendCallback({
         run_uuid: run.run_uuid,
         status: 'completed',
-        findings: [
-          { title: article.title, content: article.content, excerpt: article.excerpt, tags: article.tags, post_id: submitResult.post_id, source: briefing.sources }
-        ],
+        category: topic.category,
+        findings,
       });
-      log.info('run-completed', { runUuid: run.run_uuid });
+      log.info('run-completed', { runUuid: run.run_uuid, findingsCount: findings.length });
     }
 
-    return { title: article.title, content: article.content, excerpt: article.excerpt, tags: article.tags, _briefing: briefing };
+    return { topic: topic.title, sourceCount: sources.length };
   }
 
   const results = await Promise.all(claimedRuns.map(processRun));
-  const articles = results.filter(Boolean);
+  const completed = results.filter(Boolean);
 
-  log.info('worker-complete', { topicsClaimed: claimedRuns.length, articlesProduced: articles.length });
+  log.info('worker-complete', { topicsClaimed: claimedRuns.length, runsCompleted: completed.length });
 }
 
 main().catch(err => {

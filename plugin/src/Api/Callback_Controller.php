@@ -64,9 +64,17 @@ class Callback_Controller {
             $agent_run_repo->complete_run($run_uuid, $findings, $cost);
 
             $finding_repo = new \EsotericCurrent\Core\Repository\Finding_Repository();
-            foreach ($findings as $finding) {
-                $finding_repo->create_from_agent($finding, $run['id'], $run['topic_id']);
+            $created = 0;
+            $errors = [];
+            foreach ($findings as $i => $finding) {
+                try {
+                    $id = $finding_repo->create_from_agent($finding, $run['id'], $run['topic_id']);
+                    if ($id) { $created++; }
+                } catch (\Exception $e) {
+                    $errors[] = "Finding $i: " . $e->getMessage();
+                }
             }
+            error_log("EC callback: $created findings created from run $run_uuid (" . count($findings) . " received)" . ($errors ? ' Errors: ' . implode('; ', $errors) : ''));
 
             if (!empty($run['topic_id'])) {
                 $topic_repo = new \EsotericCurrent\Core\Repository\Research_Topic_Repository();

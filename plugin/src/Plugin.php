@@ -59,6 +59,7 @@ class Plugin {
         add_filter('query_vars', function (array $vars) {
             $vars[] = 'ec_topic';
             $vars[] = 'ec_resource_type';
+            $vars[] = 'ec_tab';
             return $vars;
         });
     }
@@ -115,12 +116,12 @@ class Plugin {
 
     public static function dynamic_type_css(): void {
         $types = [
-            'news-article' => '#c4a45a', 'book' => '#4a1a2e', 'event' => '#0f1b2d',
-            'interview' => '#0f1b2d', 'research-paper' => '#d4cfc4', 'podcast' => '#c4a45a',
-            'video' => '#4a1a2e', 'organization' => '#0f1b2d', 'person' => '#d4cfc4',
-            'resource' => '#c4a45a', 'development' => '#4a1a2e',
+            'news-article' => '#8b5cf6', 'book' => '#22d3ee', 'event' => '#3b82f6',
+            'interview' => '#22d3ee', 'research-paper' => '#a78bfa', 'podcast' => '#8b5cf6',
+            'video' => '#22d3ee', 'organization' => '#3b82f6', 'person' => '#a78bfa',
+            'resource' => '#8b5cf6', 'development' => '#22d3ee',
         ];
-        $colors = ['#c4a45a', '#4a1a2e', '#0f1b2d', '#d4cfc4', '#6b4c3b', '#2d5a4e', '#5a3d6b', '#8b4513', '#3d5a80', '#6b3a5a'];
+        $colors = ['#8b5cf6', '#22d3ee', '#3b82f6', '#a78bfa', '#f59e0b', '#22d3ee', '#3b82f6', '#8b5cf6'];
         $i = 0;
         echo '<style id="ec-type-colors">';
         foreach ($types as $slug => $color) {
